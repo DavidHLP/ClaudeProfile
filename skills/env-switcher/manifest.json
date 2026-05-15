@@ -1,0 +1,24 @@
+{
+  "name": "env-switcher",
+  "version": "1.0.0",
+  "description": "Claude Code 环境切换器 - 通过会话级别环境变量切换不同 API 配置",
+  "author": "user",
+  "commands": [
+    {
+      "name": "env-switch",
+      "description": "切换到指定的环境配置",
+      "usage": "/env-switch <profile-name>"
+    },
+    {
+      "name": "env-status",
+      "description": "查看当前环境配置状态",
+      "usage": "/env-status"
+    },
+    {
+      "name": "env-profile",
+      "description": "管理环境配置文件",
+      "usage": "/env-profile [list|create|delete|edit] [profile-name]"
+    }
+  ],
+  "env_profiles_path": "~/project/C-Link/env-profiles"
+}
