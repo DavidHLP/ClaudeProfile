@@ -1,0 +1,38 @@
+{
+  "name": "@claude-code/env-switcher",
+  "version": "1.0.0",
+  "description": "Claude Code 环境切换器 - 交互式管理多 API 配置",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "env-switcher": "./bin/env-switcher.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "api",
+    "environment",
+    "switcher"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^9.2.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^4.1.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
