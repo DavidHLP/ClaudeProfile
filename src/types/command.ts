@@ -1,8 +1,6 @@
-import { EnvConfig, Profile } from './index.js';
+import { EnvConfig } from './index.js';
 
-export interface CreateProfileInput {
-  providerId: string;
-  profileName: string;
+export interface ProfileCredentialsInput {
   token: string;
   baseUrl: string;
   sonnetModel: string;
@@ -10,13 +8,13 @@ export interface CreateProfileInput {
   haikuModel: string;
 }
 
-export interface EditProfileInput {
+export interface CreateProfileInput extends ProfileCredentialsInput {
+  providerId: string;
   profileName: string;
-  token: string;
-  baseUrl: string;
-  sonnetModel: string;
-  opusModel: string;
-  haikuModel: string;
+}
+
+export interface EditProfileInput extends ProfileCredentialsInput {
+  profileName: string;
 }
 
 export interface SwitchProfileInput {
@@ -27,15 +25,6 @@ export interface DeleteProfileInput {
   profileName: string;
 }
 
-export interface ListProfilesInput {
-  // No input needed for list
-}
-
-export type CommandResult = {
-  success: true;
-  output: string;
-} | {
-  success: false;
-  error: string;
-  wasCancelled?: boolean;
-};
+export type CommandResult =
+  | { success: true; output: string }
+  | { success: false; error: string; wasCancelled?: boolean };

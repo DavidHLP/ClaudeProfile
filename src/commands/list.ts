@@ -1,10 +1,10 @@
 import { profileService } from '../services/profileService.js';
 import { envPresenter } from '../presenters/envPresenter.js';
 import { CommandResult } from '../types/command.js';
-import { AppError } from '../errors.js';
+import { runCommand } from './runner.js';
 
 export async function listCommand(): Promise<CommandResult> {
-  try {
+  return runCommand('列出配置', async () => {
     const profiles = profileService.listProfiles();
     const currentProfile = profileService.getCurrentProfile();
 
@@ -13,10 +13,5 @@ export async function listCommand(): Promise<CommandResult> {
     }
 
     return { success: true, output: envPresenter.formatProfileList(profiles, currentProfile) };
-  } catch (err) {
-    if (err instanceof AppError) {
-      return { success: false, error: err.message };
-    }
-    return { success: false, error: `列出配置失败: ${err instanceof Error ? err.message : String(err)}` };
-  }
+  });
 }

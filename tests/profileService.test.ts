@@ -1,31 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
-
-// We need to test the ProfileService with a mocked config directory
-// Since the module uses singleton CONFIG_DIR, we need to re-import for each test
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ProfileServiceImpl } from '../src/services/profileService.js';
+import { InMemoryConfigStore } from '../src/config/inMemoryConfigStore.js';
+import { ProfileNotFoundError } from '../src/errors.js';
 
 describe('ProfileService', () => {
-  const originalHomedir = process.env.HOME;
-  const testConfigDir = mkdtempSync(join(tmpdir(), 'env-switcher-test-'));
-  const testHomeDir = join(testConfigDir, 'home');
-  
+  let store: InMemoryConfigStore;
+  let service: ProfileServiceImpl;
+
   beforeEach(() => {
-    mkdirSync(testHomeDir, { recursive: true });
-    process.env.HOME = testHomeDir;
-  });
-  
-  afterEach(() => {
-    process.env.HOME = originalHomedir;
-    rmSync(testConfigDir, { recursive: true, force: true });
+    store = new InMemoryConfigStore();
+    service = new ProfileServiceImpl(store);
   });
 
-  it('should list profiles from config directory', async () => {
-    // Create a test profile file directly
-    const configDir = join(testHomeDir, '.config', 'env-switcher');
-    mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, 'test-profile.json'), JSON.stringify({
+  it('should list profiles from store', () => {
+    store.saveProfile({
       name: 'test-profile',
       description: 'Test',
       env: {
@@ -36,20 +24,16 @@ describe('ProfileService', () => {
         ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus',
         ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku',
       },
-    }));
+    });
 
-    // Re-import to pick up new HOME
-    const { profileService } = await import('../src/services/profileService.js');
-    const profiles = profileService.listProfiles();
+    const profiles = service.listProfiles();
 
     expect(profiles).toHaveLength(1);
     expect(profiles[0].name).toBe('test-profile');
   });
 
-  it('should get profile by name', async () => {
-    const configDir = join(testHomeDir, '.config', 'env-switcher');
-    mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, 'minimax.json'), JSON.stringify({
+  it('should get profile by name', () => {
+    store.saveProfile({
       name: 'minimax',
       description: 'MiniMax',
       env: {
@@ -60,24 +44,20 @@ describe('ProfileService', () => {
         ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus',
         ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku',
       },
-    }));
+    });
 
-    const { profileService } = await import('../src/services/profileService.js');
-    const profile = profileService.getProfile('minimax');
+    const profile = service.getProfile('minimax');
 
     expect(profile).not.toBeNull();
-    expect(profile!.name).toBe('minimax');
-    expect(profile!.env.ANTHROPIC_BASE_URL).toBe('https://api.minimaxi.com');
+    expect(profile.name).toBe('minimax');
+    expect(profile.env.ANTHROPIC_BASE_URL).toBe('https://api.minimaxi.com');
   });
 
-  it('should throw ProfileNotFoundError for non-existent profile', async () => {
-    const { profileService } = await import('../src/services/profileService.js');
-    
-    expect(() => profileService.getProfile('non-existent')).toThrow('不存在');
+  it('should throw ProfileNotFoundError for non-existent profile', () => {
+    expect(() => service.getProfile('non-existent')).toThrow(ProfileNotFoundError);
   });
 
-  it('should save and retrieve profile', async () => {
-    const { profileService } = await import('../src/services/profileService.js');
+  it('should save and retrieve profile', () => {
     const newProfile = {
       name: 'new-profile',
       description: 'New Profile',
@@ -91,17 +71,15 @@ describe('ProfileService', () => {
       },
     };
 
-    profileService.saveProfile(newProfile);
-    const retrieved = profileService.getProfile('new-profile');
+    service.saveProfile(newProfile);
+    const retrieved = service.getProfile('new-profile');
 
     expect(retrieved.name).toBe('new-profile');
     expect(retrieved.env.ANTHROPIC_AUTH_TOKEN).toBe('new-token');
   });
 
-  it('should delete profile', async () => {
-    const configDir = join(testHomeDir, '.config', 'env-switcher');
-    mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, 'to-delete.json'), JSON.stringify({
+  it('should delete profile', () => {
+    store.saveProfile({
       name: 'to-delete',
       description: 'To Delete',
       env: {
@@ -112,35 +90,28 @@ describe('ProfileService', () => {
         ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus',
         ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku',
       },
-    }));
+    });
 
-    const { profileService } = await import('../src/services/profileService.js');
-    
-    expect(profileService.getProfile('to-delete')).not.toBeNull();
-    profileService.deleteProfile('to-delete');
-    expect(() => profileService.getProfile('to-delete')).toThrow();
+    expect(service.getProfile('to-delete')).not.toBeNull();
+    service.deleteProfile('to-delete');
+    expect(() => service.getProfile('to-delete')).toThrow(ProfileNotFoundError);
   });
 
-  it('should set and get current profile', async () => {
-    const { profileService } = await import('../src/services/profileService.js');
-    
-    profileService.setCurrentProfile('test-profile');
-    const current = profileService.getCurrentProfile();
-    
+  it('should set and get current profile', () => {
+    service.setCurrentProfile('test-profile');
+    const current = service.getCurrentProfile();
+
     expect(current).toBe('test-profile');
   });
 
-  it('should return null when no current profile set', async () => {
-    const { profileService } = await import('../src/services/profileService.js');
-    const current = profileService.getCurrentProfile();
-    
+  it('should return null when no current profile set', () => {
+    const current = service.getCurrentProfile();
+
     expect(current).toBeNull();
   });
 
-  it('should check profile existence', async () => {
-    const configDir = join(testHomeDir, '.config', 'env-switcher');
-    mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, 'existing.json'), JSON.stringify({
+  it('should check profile existence', () => {
+    store.saveProfile({
       name: 'existing',
       description: 'Existing',
       env: {
@@ -151,37 +122,34 @@ describe('ProfileService', () => {
         ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus',
         ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku',
       },
-    }));
+    });
 
-    const { profileService } = await import('../src/services/profileService.js');
-
-    expect(profileService.profileExists('existing')).toBe(true);
-    expect(profileService.profileExists('non-existent')).toBe(false);
+    expect(service.profileExists('existing')).toBe(true);
+    expect(service.profileExists('non-existent')).toBe(false);
   });
 
-  it('should set and get previous profile', async () => {
-    const { profileService } = await import('../src/services/profileService.js');
-
-    profileService.setPreviousProfile('old-profile');
-    const prev = profileService.getPreviousProfile();
+  it('should set and get previous profile', () => {
+    service.setPreviousProfile('old-profile');
+    const prev = service.getPreviousProfile();
 
     expect(prev).toBe('old-profile');
   });
 
-  it('should return null when no previous profile set', async () => {
-    const { profileService } = await import('../src/services/profileService.js');
-    const prev = profileService.getPreviousProfile();
+  it('should return null when no previous profile set', () => {
+    const prev = service.getPreviousProfile();
 
     expect(prev).toBeNull();
   });
 
-  it('should clear previous profile when set to null', async () => {
-    const { profileService } = await import('../src/services/profileService.js');
+  it('should clear previous profile when set to null', () => {
+    service.setPreviousProfile('old-profile');
+    expect(service.getPreviousProfile()).toBe('old-profile');
 
-    profileService.setPreviousProfile('old-profile');
-    expect(profileService.getPreviousProfile()).toBe('old-profile');
+    service.setPreviousProfile(null);
+    expect(service.getPreviousProfile()).toBeNull();
+  });
 
-    profileService.setPreviousProfile(null);
-    expect(profileService.getPreviousProfile()).toBeNull();
+  it('should return null for store location with in-memory store', () => {
+    expect(service.getStoreLocation()).toBeNull();
   });
 });

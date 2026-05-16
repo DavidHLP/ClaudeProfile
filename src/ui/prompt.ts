@@ -1,6 +1,21 @@
 import inquirer from 'inquirer';
 import { ProviderTemplate } from '../types/index.js';
 
+async function promptInput(options: {
+  message: string;
+  default?: string;
+  validate?: (input: string) => string | true;
+}): Promise<string> {
+  const { value } = await inquirer.prompt({
+    type: 'input',
+    name: 'value',
+    message: options.message,
+    default: options.default,
+    validate: options.validate,
+  });
+  return value.trim();
+}
+
 export async function selectProvider(providers: ProviderTemplate[]): Promise<ProviderTemplate> {
   const choices = providers.map((p) => ({
     name: `${p.name} - ${p.description}`,
@@ -18,9 +33,7 @@ export async function selectProvider(providers: ProviderTemplate[]): Promise<Pro
 }
 
 export async function inputProfileName(defaultName: string): Promise<string> {
-  const { name } = await inquirer.prompt({
-    type: 'input',
-    name: 'name',
+  return promptInput({
     message: '配置名称:',
     default: defaultName,
     validate: (input: string) => {
@@ -29,26 +42,20 @@ export async function inputProfileName(defaultName: string): Promise<string> {
       return true;
     },
   });
-  return name.trim();
 }
 
 export async function inputApiToken(): Promise<string> {
-  const { token } = await inquirer.prompt({
-    type: 'input',
-    name: 'token',
+  return promptInput({
     message: 'API Token:',
     validate: (input: string) => {
       if (!input.trim()) return 'Token 不能为空';
       return true;
     },
   });
-  return token.trim();
 }
 
-export async function inputBaseUrl(defaultValue: string): Promise<string> {
-  const { url } = await inquirer.prompt({
-    type: 'input',
-    name: 'url',
+export async function inputBaseUrl(defaultValue?: string): Promise<string> {
+  return promptInput({
     message: 'API Base URL:',
     default: defaultValue,
     validate: (input: string) => {
@@ -59,27 +66,10 @@ export async function inputBaseUrl(defaultValue: string): Promise<string> {
       return true;
     },
   });
-  return url.trim();
 }
 
-export async function inputModel(defaultValue: string): Promise<string> {
-  const { model } = await inquirer.prompt({
-    type: 'input',
-    name: 'model',
-    message: '默认模型:',
-    default: defaultValue,
-    validate: (input: string) => {
-      if (!input.trim()) return '模型名称不能为空';
-      return true;
-    },
-  });
-  return model.trim();
-}
-
-export async function inputSonnetModel(defaultValue: string): Promise<string> {
-  const { model } = await inquirer.prompt({
-    type: 'input',
-    name: 'model',
+export async function inputSonnetModel(defaultValue?: string): Promise<string> {
+  return promptInput({
     message: 'SONNET 模型:',
     default: defaultValue,
     validate: (input: string) => {
@@ -87,13 +77,10 @@ export async function inputSonnetModel(defaultValue: string): Promise<string> {
       return true;
     },
   });
-  return model.trim();
 }
 
-export async function inputOpusModel(defaultValue: string): Promise<string> {
-  const { model } = await inquirer.prompt({
-    type: 'input',
-    name: 'model',
+export async function inputOpusModel(defaultValue?: string): Promise<string> {
+  return promptInput({
     message: 'OPUS 模型:',
     default: defaultValue,
     validate: (input: string) => {
@@ -101,13 +88,10 @@ export async function inputOpusModel(defaultValue: string): Promise<string> {
       return true;
     },
   });
-  return model.trim();
 }
 
-export async function inputHaikuModel(defaultValue: string): Promise<string> {
-  const { model } = await inquirer.prompt({
-    type: 'input',
-    name: 'model',
+export async function inputHaikuModel(defaultValue?: string): Promise<string> {
+  return promptInput({
     message: 'HAIKU 模型:',
     default: defaultValue,
     validate: (input: string) => {
@@ -115,7 +99,6 @@ export async function inputHaikuModel(defaultValue: string): Promise<string> {
       return true;
     },
   });
-  return model.trim();
 }
 
 export async function confirmAction(message: string): Promise<boolean> {

@@ -2,10 +2,10 @@ import { EnvConfig } from '../types/index.js';
 import { profileService } from '../services/profileService.js';
 import { envPresenter } from '../presenters/envPresenter.js';
 import { EditProfileInput, CommandResult } from '../types/command.js';
-import { AppError } from '../errors.js';
+import { runCommand } from './runner.js';
 
 export async function editCommand(input: EditProfileInput): Promise<CommandResult> {
-  try {
+  return runCommand('编辑配置', async () => {
     const profile = profileService.getProfile(input.profileName);
 
     profile.env.ANTHROPIC_AUTH_TOKEN = input.token;
@@ -18,17 +18,12 @@ export async function editCommand(input: EditProfileInput): Promise<CommandResul
     profileService.saveProfile(profile);
 
     return { success: true, output: envPresenter.formatEditSuccess(input.profileName) };
-  } catch (err) {
-    if (err instanceof AppError) {
-      return { success: false, error: err.message };
-    }
-    return { success: false, error: `编辑配置失败: ${err instanceof Error ? err.message : String(err)}` };
-  }
+  });
 }
 
 export async function editCommandInteractive(): Promise<CommandResult> {
   const { selectExistingProfile, inputApiToken, inputBaseUrl, inputSonnetModel, inputOpusModel, inputHaikuModel } = await import('../ui/prompt.js');
-  
+
   const profiles = profileService.listProfiles();
   if (profiles.length === 0) {
     return { success: false, error: '没有可编辑的配置。请先使用 create 命令创建配置。' };

@@ -1,27 +1,22 @@
 import { profileService } from '../services/profileService.js';
 import { envPresenter } from '../presenters/envPresenter.js';
 import { DeleteProfileInput, CommandResult } from '../types/command.js';
-import { AppError } from '../errors.js';
+import { runCommand } from './runner.js';
 
 export async function deleteCommand(input: DeleteProfileInput): Promise<CommandResult> {
-  try {
+  return runCommand('删除配置', async () => {
     const currentProfile = profileService.getCurrentProfile();
     const isActive = input.profileName === currentProfile;
 
     profileService.deleteProfile(input.profileName);
 
     return { success: true, output: envPresenter.formatDeleteSuccess(input.profileName, isActive) };
-  } catch (err) {
-    if (err instanceof AppError) {
-      return { success: false, error: err.message };
-    }
-    return { success: false, error: `删除配置失败: ${err instanceof Error ? err.message : String(err)}` };
-  }
+  });
 }
 
 export async function deleteCommandInteractive(): Promise<CommandResult> {
   const { selectExistingProfile, confirmAction } = await import('../ui/prompt.js');
-  
+
   const profiles = profileService.listProfiles();
   if (profiles.length === 0) {
     return { success: false, error: '没有可删除的配置。' };

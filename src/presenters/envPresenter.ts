@@ -1,8 +1,6 @@
 import { EnvConfig, Profile } from '../types/index.js';
 
 export interface EnvPresenter {
-  buildExportCommands(env: EnvConfig): string;
-  buildSwitchCommands(oldEnv: EnvConfig | null, newEnv: EnvConfig): string;
   formatProfileList(profiles: Profile[], currentProfile: string | null): string;
   formatCreateSuccess(profileName: string, profilePath: string): string;
   formatSwitchSuccess(profileName: string, env: EnvConfig): string;
@@ -58,14 +56,6 @@ export function buildSwitchCommands(oldEnv: EnvConfig | null, newEnv: EnvConfig)
 }
 
 class EnvPresenterImpl implements EnvPresenter {
-  buildExportCommands(env: EnvConfig): string {
-    return buildExportCommands(env);
-  }
-
-  buildSwitchCommands(oldEnv: EnvConfig | null, newEnv: EnvConfig): string {
-    return buildSwitchCommands(oldEnv, newEnv);
-  }
-
   formatProfileList(profiles: Profile[], currentProfile: string | null): string {
     const lines: string[] = [];
     lines.push('\x1b[34m=== Claude Code 环境配置 ===\x1b[0m');
@@ -88,8 +78,8 @@ class EnvPresenterImpl implements EnvPresenter {
       const marker = isActive ? ' \x1b[32m*\x1b[0m ' : '   ';
       lines.push(`${marker}\x1b[1m${profile.name}\x1b[0m`);
       lines.push(`    描述: ${profile.description}`);
-      lines.push(`    URL: ${profile.env.ANTHROPIC_BASE_URL}`);
-      lines.push(`    模型: ${profile.env.ANTHROPIC_MODEL}`);
+      lines.push(`    URL: ${profile.env.ANTHROPIC_BASE_URL || 'N/A'}`);
+      lines.push(`    模型: ${profile.env.ANTHROPIC_MODEL || 'N/A'}`);
       lines.push('');
     }
 

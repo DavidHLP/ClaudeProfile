@@ -1,20 +1,13 @@
 import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envPresenter.js';
+import { envPresenter, buildSwitchCommands } from '../presenters/envPresenter.js';
 import { SwitchProfileInput, CommandResult } from '../types/command.js';
-import { AppError } from '../errors.js';
+import { runCommand } from './runner.js';
+import { resolveOldEnv } from '../engine/activation.js';
 
 export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = process.stdout.isTTY): Promise<CommandResult> {
-  try {
-    let oldEnv = null;
-    try {
-      const currentProfileName = profileService.getCurrentProfile();
-      if (currentProfileName && currentProfileName !== input.profileName) {
-        const oldProfile = profileService.getProfile(currentProfileName);
-        oldEnv = oldProfile.env;
-      }
-    } catch {
-      // Old profile not found or unreadable; skip cleanup diff
-    }
+  return runCommand('切换配置', async () => {
+    const currentProfileName = profileService.getCurrentProfile();
+    const oldEnv = resolveOldEnv(profileService, currentProfileName, input.profileName);
 
     const profile = profileService.getProfile(input.profileName);
     profileService.setCurrentProfile(input.profileName);
@@ -22,14 +15,9 @@ export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = 
     if (isTTY) {
       return { success: true, output: envPresenter.formatSwitchSuccess(input.profileName, profile.env) };
     } else {
-      return { success: true, output: envPresenter.buildSwitchCommands(oldEnv, profile.env) };
+      return { success: true, output: buildSwitchCommands(oldEnv, profile.env) };
     }
-  } catch (err) {
-    if (err instanceof AppError) {
-      return { success: false, error: err.message };
-    }
-    return { success: false, error: `切换配置失败: ${err instanceof Error ? err.message : String(err)}` };
-  }
+  });
 }
 
 export async function switchCommandInteractive(): Promise<CommandResult> {

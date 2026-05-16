@@ -1,15 +1,6 @@
-import { Profile, EnvConfig } from '../types/index.js';
-import {
-  getConfigDir,
-  listProfiles as listFromDisk,
-  getProfile as getFromDisk,
-  saveProfile as saveToDisk,
-  deleteProfile as deleteFromDisk,
-  getCurrentProfile as getCurrentFromDisk,
-  setCurrentProfile as setCurrentToDisk,
-  getPreviousProfile as getPreviousFromDisk,
-  setPreviousProfile as setPreviousToDisk
-} from '../config/manager.js';
+import { Profile } from '../types/index.js';
+import { ConfigStore } from '../config/configStore.js';
+import { FileSystemConfigStore } from '../config/fileSystemConfigStore.js';
 import { ProfileNotFoundError, FileOperationError } from '../errors.js';
 
 export interface ProfileService {
@@ -22,19 +13,22 @@ export interface ProfileService {
   profileExists(name: string): boolean;
   getPreviousProfile(): string | null;
   setPreviousProfile(name: string | null): void;
+  getStoreLocation(): string | null;
 }
 
-class ProfileServiceImpl implements ProfileService {
+export class ProfileServiceImpl implements ProfileService {
+  constructor(private readonly store: ConfigStore) {}
+
   listProfiles(): Profile[] {
     try {
-      return listFromDisk();
+      return this.store.listProfiles();
     } catch (err) {
-      throw new FileOperationError('list', getConfigDir(), err);
+      throw new FileOperationError('list', 'config store', err);
     }
   }
 
   getProfile(name: string): Profile {
-    const profile = getFromDisk(name);
+    const profile = this.store.getProfile(name);
     if (!profile) {
       throw new ProfileNotFoundError(name);
     }
@@ -43,14 +37,14 @@ class ProfileServiceImpl implements ProfileService {
 
   saveProfile(profile: Profile): void {
     try {
-      saveToDisk(profile);
+      this.store.saveProfile(profile);
     } catch (err) {
-      throw new FileOperationError('save', `${getConfigDir()}/${profile.name}.json`, err);
+      throw new FileOperationError('save', `config store/${profile.name}.json`, err);
     }
   }
 
   deleteProfile(name: string): void {
-    const success = deleteFromDisk(name);
+    const success = this.store.deleteProfile(name);
     if (!success) {
       throw new ProfileNotFoundError(name);
     }
@@ -58,27 +52,27 @@ class ProfileServiceImpl implements ProfileService {
 
   getCurrentProfile(): string | null {
     try {
-      return getCurrentFromDisk();
+      return this.store.getCurrentProfile();
     } catch (err) {
-      throw new FileOperationError('read current', getConfigDir(), err);
+      throw new FileOperationError('read current', 'config store', err);
     }
   }
 
   setCurrentProfile(name: string): void {
     try {
-      setCurrentToDisk(name);
+      this.store.setCurrentProfile(name);
     } catch (err) {
-      throw new FileOperationError('write current', getConfigDir(), err);
+      throw new FileOperationError('write current', 'config store', err);
     }
   }
 
   profileExists(name: string): boolean {
-    return getFromDisk(name) !== null;
+    return this.store.getProfile(name) !== null;
   }
 
   getPreviousProfile(): string | null {
     try {
-      return getPreviousFromDisk();
+      return this.store.getPreviousProfile();
     } catch {
       return null;
     }
@@ -86,11 +80,15 @@ class ProfileServiceImpl implements ProfileService {
 
   setPreviousProfile(name: string | null): void {
     try {
-      setPreviousToDisk(name);
+      this.store.setPreviousProfile(name);
     } catch (err) {
-      throw new FileOperationError('write previous', getConfigDir(), err);
+      throw new FileOperationError('write previous', 'config store', err);
     }
+  }
+
+  getStoreLocation(): string | null {
+    return this.store.getStoreLocation();
   }
 }
 
-export const profileService: ProfileService = new ProfileServiceImpl();
+export const profileService: ProfileService = new ProfileServiceImpl(new FileSystemConfigStore());

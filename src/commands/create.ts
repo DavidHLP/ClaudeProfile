@@ -3,11 +3,10 @@ import { providerTemplates, getProviderById } from '../templates/providers.js';
 import { profileService } from '../services/profileService.js';
 import { envPresenter } from '../presenters/envPresenter.js';
 import { CreateProfileInput, CommandResult } from '../types/command.js';
-import { AppError } from '../errors.js';
-import { getConfigDir } from '../config/manager.js';
+import { runCommand } from './runner.js';
 
 export async function createCommand(input: CreateProfileInput): Promise<CommandResult> {
-  try {
+  return runCommand('创建配置', async () => {
     const provider = getProviderById(input.providerId);
     if (!provider) {
       return { success: false, error: `未知的 Provider: ${input.providerId}` };
@@ -31,19 +30,15 @@ export async function createCommand(input: CreateProfileInput): Promise<CommandR
 
     profileService.saveProfile(profile);
 
-    const profilePath = `${getConfigDir()}/${input.profileName}.json`;
+    const location = profileService.getStoreLocation();
+    const profilePath = location ? `${location}/${input.profileName}.json` : input.profileName;
     return { success: true, output: envPresenter.formatCreateSuccess(input.profileName, profilePath) };
-  } catch (err) {
-    if (err instanceof AppError) {
-      return { success: false, error: err.message };
-    }
-    return { success: false, error: `创建配置失败: ${err instanceof Error ? err.message : String(err)}` };
-  }
+  });
 }
 
 export async function createCommandInteractive(): Promise<CommandResult> {
   const { selectProvider, inputProfileName, inputApiToken, inputBaseUrl, inputSonnetModel, inputOpusModel, inputHaikuModel } = await import('../ui/prompt.js');
-  
+
   const provider = await selectProvider(providerTemplates);
   const profileName = await inputProfileName(provider.id);
   const token = await inputApiToken();

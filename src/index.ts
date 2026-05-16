@@ -6,10 +6,14 @@ export { switchCommand, switchCommandInteractive } from './commands/switch.js';
 export { exportCommand, exportCurrentCommand, type ExportProfileInput } from './commands/export.js';
 export { initCommand } from './commands/init.js';
 
-export type { CreateProfileInput, EditProfileInput, SwitchProfileInput, DeleteProfileInput, CommandResult } from './types/command.js';
+export type { CreateProfileInput, EditProfileInput, ProfileCredentialsInput, SwitchProfileInput, DeleteProfileInput, CommandResult } from './types/command.js';
 export type { ProfileService } from './services/profileService.js';
 export type { EnvPresenter } from './presenters/envPresenter.js';
 
-export { profileService } from './services/profileService.js';
+export { ProfileServiceImpl, profileService } from './services/profileService.js';
 export { envPresenter } from './presenters/envPresenter.js';
 export { buildExportCommands, buildSwitchCommands } from './presenters/envPresenter.js';
+
+export type { ConfigStore } from './config/configStore.js';
+export { FileSystemConfigStore } from './config/fileSystemConfigStore.js';
+export { InMemoryConfigStore } from './config/inMemoryConfigStore.js';

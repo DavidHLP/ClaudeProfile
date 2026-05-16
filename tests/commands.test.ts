@@ -31,6 +31,7 @@ const mockProfileService = {
   profileExists: vi.fn().mockReturnValue(true),
   getPreviousProfile: vi.fn().mockReturnValue(null),
   setPreviousProfile: vi.fn(),
+  getStoreLocation: vi.fn().mockReturnValue('/test/config'),
 };
 
 vi.mock('../src/services/profileService.js', () => ({
@@ -305,7 +306,9 @@ describe('Commands', () => {
     });
 
     it('should return error for non-existent profile', async () => {
-      mockProfileService.getProfile.mockReturnValue(null);
+      mockProfileService.getProfile.mockImplementationOnce(() => {
+        throw new ProfileNotFoundError('non-existent');
+      });
 
       const { exportCommand } = await import('../src/commands/export.js');
       const result = await exportCommand({ profileName: 'non-existent' });
@@ -339,7 +342,9 @@ describe('Commands', () => {
 
     it('should return error when current profile not found', async () => {
       mockProfileService.getCurrentProfile.mockReturnValue('ghost-profile');
-      mockProfileService.getProfile.mockReturnValue(null);
+      mockProfileService.getProfile.mockImplementationOnce(() => {
+        throw new ProfileNotFoundError('ghost-profile');
+      });
 
       const { exportCurrentCommand } = await import('../src/commands/export.js');
       const result = await exportCurrentCommand();
