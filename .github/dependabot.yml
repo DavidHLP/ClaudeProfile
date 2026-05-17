@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    reviewers:
+      - DavidHLP
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore
+      prefix-development: chore(dev)
+      include: scope

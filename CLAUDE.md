@@ -1,4 +1,4 @@
-# C-Link
+# ClaudeProfile
 
 ## Agent skills
 
@@ -20,7 +20,7 @@ Single-context layout: one `CONTEXT.md` + `docs/adr/` at repo root. See `docs/ag
 - Test: `npm run test` (vitest run)
 - Test watch: `npm run test:watch`
 - Type check: `npx tsc --noEmit`
-- **Critical:** Global CLI reads from `dist/`. Always run `npm run build` after modifying `src/` or the installed `env-switcher` will execute stale code.
+- **Critical:** Global CLI reads from `dist/`. Always run `npm run build` after modifying `src/` or the installed `claude-profile` will execute stale code.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ CLI tool for managing multiple AI API configurations (Profiles). Key domains:
 - **Profile**: Named API config (base URL, auth token, model)
 - **Provider Template**: Built-in provider presets
 - **Shell Hook**: Eval Bridge pattern to inject env vars into parent shell
-- **Config Store**: `~/.config/env-switcher/`
+- **Config Store**: `~/.config/claude-profile/`
 
 Source layout: `src/{commands,config,engine,presenters,services,templates,types,ui}`
 
@@ -48,9 +48,10 @@ Source layout: `src/{commands,config,engine,presenters,services,templates,types,
 
 ## Config Locations
 
-- Profiles: `~/.config/env-switcher/`
+- Profiles: `~/.config/claude-profile/`
 - Claude Code settings: `~/.claude/settings.json`
 
 ## Runtime Notes
 
-- `env-switcher` is installed globally (`npm link` or `npm i -g`). It can be invoked from any directory, not just the repo root.
+- `claude-profile` is installed globally (`npm link` or `npm i -g`). It can be invoked from any directory, not just the repo root.
+- **npm link workaround** — If `npm link` succeeds but the command isn't found, npm prefix may be redirected (e.g. Zed). Manually symlink: `ln -sf /home/david/project/C-Link/bin/claude-profile.js ~/.local/bin/claude-profile && chmod +x ~/.local/bin/claude-profile`

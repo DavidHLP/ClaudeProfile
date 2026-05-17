@@ -10,7 +10,7 @@ describe('ClaudeSettingsStoreImpl', () => {
   let settingsPath: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'env-switcher-test-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'claude-profile-test-'));
     settingsPath = join(tempDir, 'settings.json');
   });
 

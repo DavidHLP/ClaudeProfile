@@ -15,7 +15,7 @@ export async function deleteCommand(input: DeleteProfileInput): Promise<CommandR
 }
 
 export async function deleteCommandInteractive(): Promise<CommandResult> {
-  const { selectExistingProfile, confirmAction } = await import('../ui/prompt.js');
+  const { selectProfileFromList, confirmAction } = await import('../ui/prompt.js');
 
   const profiles = profileService.listProfiles();
   if (profiles.length === 0) {
@@ -23,10 +23,7 @@ export async function deleteCommandInteractive(): Promise<CommandResult> {
   }
 
   const currentProfile = profileService.getCurrentProfile();
-  const selectedName = await selectExistingProfile(
-    profiles.map((p) => p.name),
-    currentProfile
-  );
+  const selectedName = await selectProfileFromList(profiles, currentProfile);
 
   if (!selectedName) {
     return { success: false, error: '已取消删除。', wasCancelled: true };
@@ -35,7 +32,7 @@ export async function deleteCommandInteractive(): Promise<CommandResult> {
   const isActive = selectedName === currentProfile;
   let confirmMessage = `确定要删除配置 '${selectedName}' 吗？`;
   if (isActive) {
-    confirmMessage += '\n\x1b[33m警告: 这是当前激活的配置！\x1b[0m';
+    confirmMessage += `\n${envPresenter.formatWarning('这是当前激活的配置！')}`;
   }
 
   const confirmed = await confirmAction(confirmMessage);

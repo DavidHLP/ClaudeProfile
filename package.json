@@ -1,11 +1,11 @@
 {
-  "name": "@claude-code/env-switcher",
+  "name": "@claude-code/claude-profile",
   "version": "1.0.0",
-  "description": "Claude Code 环境切换器 - 交互式管理多 API 配置",
+  "description": "Claude Code 配置文件管理器 - 交互式管理多 API 配置",
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "env-switcher": "./bin/env-switcher.js"
+    "claude-profile": "./bin/claude-profile.js"
   },
   "scripts": {
     "build": "tsc",

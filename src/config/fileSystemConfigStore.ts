@@ -10,7 +10,7 @@ export class FileSystemConfigStore implements ConfigStore {
   private readonly prevFile: string;
 
   constructor() {
-    this.configDir = join(homedir(), '.config', 'env-switcher');
+    this.configDir = join(homedir(), '.config', 'claude-profile');
     this.currentFile = join(this.configDir, '.current');
     this.prevFile = join(this.configDir, '.current-prev');
     this.ensureConfigDir();

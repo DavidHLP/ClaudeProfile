@@ -4,11 +4,12 @@ import type { EnvConfig, Profile } from '../src/types/index.js';
 
 describe('EnvPresenter', () => {
   describe('formatBanner', () => {
-    it('should return non-empty banner with ENV-SWITCHER title', () => {
+    it('should return non-empty banner with Unicode box-drawing and Chinese title', () => {
       const banner = envPresenter.formatBanner();
       expect(banner.length).toBeGreaterThan(0);
-      expect(banner).toContain('ENV-SWITCHER');
-      expect(banner).toContain('+--');
+      expect(banner).toContain('环境切换器');
+      expect(banner).toContain('┌');
+      expect(banner).toContain('┐');
     });
   });
 
@@ -129,11 +130,11 @@ describe('EnvPresenter', () => {
     it('should show empty state when no profiles', () => {
       const result = envPresenter.formatProfileList([], null);
 
-      expect(result).toContain('no profiles available');
-      expect(result).toContain('env-switcher create');
+      expect(result).toContain('没有可用的配置');
+      expect(result).toContain('claude-profile create');
     });
 
-    it('should show current profile with > marker and ACTIVE status', () => {
+    it('should show current profile with active marker and 已激活 status', () => {
       const profiles: Profile[] = [{
         name: 'minimax',
         description: 'MiniMax',
@@ -149,13 +150,13 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatProfileList(profiles, 'minimax');
 
-      expect(result).toContain('>');
+      expect(result).toContain('●');
       expect(result).toContain('minimax');
-      expect(result).toContain('ACTIVE');
+      expect(result).toContain('已激活');
       expect(result).toContain('[ ***** ]');
     });
 
-    it('should show inactive profile without > marker and with Standby status', () => {
+    it('should show inactive profile with standby marker and 待命 status', () => {
       const profiles: Profile[] = [{
         name: 'minimax',
         description: 'MiniMax',
@@ -171,8 +172,8 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatProfileList(profiles, null);
 
-      expect(result).not.toContain('> minimax');
-      expect(result).toContain('Standby');
+      expect(result).toContain('○');
+      expect(result).toContain('待命');
       expect(result).toContain('minimax');
     });
 
@@ -214,10 +215,10 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatSwitchSuccess('test-profile', env);
 
-      expect(result).toContain('>>');
-      expect(result).toContain('switched to:');
+      expect(result).toContain('❯');
+      expect(result).toContain('已切换到');
       expect(result).toContain('test-profile');
-      expect(result).toContain('synced');
+      expect(result).toContain('环境变量已同步');
     });
   });
 

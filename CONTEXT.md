@@ -1,4 +1,4 @@
-# C-Link
+# ClaudeProfile
 
 Claude Code 的多 API 配置管理工具，通过命名 Profile 在不同 AI 提供商之间快速切换。
 
@@ -37,7 +37,7 @@ _Avoid_: 环境变量, env 字段, env 配置
 _Avoid_: 默认状态, 未初始化
 
 **Config Store**:
-持久化存储所有 Profile 和 Active Profile 标记的位置（`~/.config/env-switcher/`）。
+持久化存储所有 Profile 和 Active Profile 标记的位置（`~/.config/claude-profile/`）。
 _Avoid_: 配置目录, config directory, profileService
 
 ## Relationships

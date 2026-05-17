@@ -1,5 +1,7 @@
 import inquirer from 'inquirer';
 import { ProviderTemplate, Profile } from '../types/index.js';
+import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
+import { icon, theme, padVisualEnd, stripAnsi } from './theme.js';
 
 async function promptInput(options: {
   message: string;
@@ -110,29 +112,6 @@ export async function confirmAction(message: string): Promise<boolean> {
   return confirm;
 }
 
-export async function selectExistingProfile(names: string[], currentProfile: string | null): Promise<string | null> {
-  if (names.length === 0) {
-    return null;
-  }
-
-  const choices = names.map((name) => ({
-    name,
-    value: name,
-  }));
-
-  const currentIndex = currentProfile ? names.indexOf(currentProfile) : 0;
-
-  const { selected } = await inquirer.prompt({
-    type: 'list',
-    name: 'selected',
-    message: 'Select profile:',
-    choices,
-    default: currentIndex >= 0 ? currentIndex : 0,
-  });
-
-  return selected;
-}
-
 export async function selectProfileFromList(profiles: Profile[], currentProfile: string | null): Promise<string | null> {
   if (profiles.length === 0) {
     return null;
@@ -140,11 +119,11 @@ export async function selectProfileFromList(profiles: Profile[], currentProfile:
 
   const choices = profiles.map((p) => {
     const isActive = p.name === currentProfile;
-    const status = isActive ? 'ACTIVE' : 'Standby';
+    const statusIcon = isActive ? icon.active : icon.standby;
     const provider = p.description || 'Unknown';
     const apiKey = p.env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]';
     return {
-      name: `${p.name} — ${provider} (${status}) ${apiKey}`,
+      name: `${statusIcon} ${p.name} — ${provider} ${apiKey}`,
       value: p.name,
     };
   });
@@ -154,10 +133,53 @@ export async function selectProfileFromList(profiles: Profile[], currentProfile:
   const { selected } = await inquirer.prompt({
     type: 'list',
     name: 'selected',
-    message: 'Select profile:',
+    message: '请选择配置:',
     choices,
     default: currentIndex >= 0 ? currentIndex : 0,
   });
 
   return selected;
+}
+
+function describeFieldValue(field: EditableField, profile: Profile): string {
+  const env = profile.env;
+  switch (field) {
+    case 'token':
+      return env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]';
+    case 'baseUrl':
+      return env.ANTHROPIC_BASE_URL || '(未设置)';
+    case 'sonnetModel':
+      return env.ANTHROPIC_DEFAULT_SONNET_MODEL || env.ANTHROPIC_MODEL || '(未设置)';
+    case 'opusModel':
+      return env.ANTHROPIC_DEFAULT_OPUS_MODEL || '(未设置)';
+    case 'haikuModel':
+      return env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '(未设置)';
+  }
+}
+
+export async function selectEditField(profile: Profile): Promise<EditableField | null> {
+  const fields: EditableField[] = ['token', 'baseUrl', 'sonnetModel', 'opusModel', 'haikuModel'];
+
+  const labelWidth = Math.max(...fields.map((f) => stripAnsi(EDITABLE_FIELD_LABELS[f]).length));
+
+  const fieldChoices = fields.map((f) => ({
+    name: `${padVisualEnd(EDITABLE_FIELD_LABELS[f], labelWidth)}  ${theme.dim(describeFieldValue(f, profile))}`,
+    value: f,
+  }));
+
+  const choices = [
+    ...fieldChoices,
+    new inquirer.Separator(),
+    { name: theme.dim('取消'), value: null },
+  ];
+
+  const { field } = await inquirer.prompt({
+    type: 'list',
+    name: 'field',
+    message: '请选择要修改的字段:',
+    choices,
+    pageSize: 10,
+  });
+
+  return field as EditableField | null;
 }
