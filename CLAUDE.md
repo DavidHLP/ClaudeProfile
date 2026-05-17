@@ -20,6 +20,7 @@ Single-context layout: one `CONTEXT.md` + `docs/adr/` at repo root. See `docs/ag
 - Test: `npm run test` (vitest run)
 - Test watch: `npm run test:watch`
 - Type check: `npx tsc --noEmit`
+- **Critical:** Global CLI reads from `dist/`. Always run `npm run build` after modifying `src/` or the installed `env-switcher` will execute stale code.
 
 ## Architecture
 
@@ -30,6 +31,11 @@ CLI tool for managing multiple AI API configurations (Profiles). Key domains:
 - **Config Store**: `~/.config/env-switcher/`
 
 Source layout: `src/{commands,config,engine,presenters,services,templates,types,ui}`
+
+## CLI UI Patterns
+
+- Presenter layer uses raw ANSI escape codes (not chalk). `padEnd()` does not handle ANSI sequences — use a `stripAnsi` helper before computing visual padding.
+- Avoid pairing a custom ANSI table with `inquirer` list prompts; this creates a "dual UI" where the table looks interactive but isn't. Either make the table itself interactive or embed all info into the inquirer choices.
 
 ## Claude Code Settings Sync
 
@@ -44,3 +50,7 @@ Source layout: `src/{commands,config,engine,presenters,services,templates,types,
 
 - Profiles: `~/.config/env-switcher/`
 - Claude Code settings: `~/.claude/settings.json`
+
+## Runtime Notes
+
+- `env-switcher` is installed globally (`npm link` or `npm i -g`). It can be invoked from any directory, not just the repo root.

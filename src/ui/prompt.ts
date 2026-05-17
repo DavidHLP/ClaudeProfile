@@ -1,5 +1,5 @@
 import inquirer from 'inquirer';
-import { ProviderTemplate } from '../types/index.js';
+import { ProviderTemplate, Profile } from '../types/index.js';
 
 async function promptInput(options: {
   message: string;
@@ -116,16 +116,47 @@ export async function selectExistingProfile(names: string[], currentProfile: str
   }
 
   const choices = names.map((name) => ({
-    name: name === currentProfile ? `[*] ${name}  (current)` : `[ ] ${name}`,
+    name,
     value: name,
   }));
+
+  const currentIndex = currentProfile ? names.indexOf(currentProfile) : 0;
 
   const { selected } = await inquirer.prompt({
     type: 'list',
     name: 'selected',
     message: 'Select profile:',
     choices,
-    loop: false,
+    default: currentIndex >= 0 ? currentIndex : 0,
+  });
+
+  return selected;
+}
+
+export async function selectProfileFromList(profiles: Profile[], currentProfile: string | null): Promise<string | null> {
+  if (profiles.length === 0) {
+    return null;
+  }
+
+  const choices = profiles.map((p) => {
+    const isActive = p.name === currentProfile;
+    const status = isActive ? 'ACTIVE' : 'Standby';
+    const provider = p.description || 'Unknown';
+    const apiKey = p.env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]';
+    return {
+      name: `${p.name} — ${provider} (${status}) ${apiKey}`,
+      value: p.name,
+    };
+  });
+
+  const currentIndex = currentProfile ? profiles.findIndex((p) => p.name === currentProfile) : 0;
+
+  const { selected } = await inquirer.prompt({
+    type: 'list',
+    name: 'selected',
+    message: 'Select profile:',
+    choices,
+    default: currentIndex >= 0 ? currentIndex : 0,
   });
 
   return selected;

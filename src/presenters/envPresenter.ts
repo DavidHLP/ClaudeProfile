@@ -19,6 +19,16 @@ const bold = (text: string): string => s(styles.bold, text);
 const green = (text: string): string => s(styles.green, text);
 const dim = (text: string): string => s(styles.dim, text);
 
+function stripAnsi(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+function padVisualEnd(text: string, targetWidth: number): string {
+  const visualLen = stripAnsi(text).length;
+  const padding = Math.max(0, targetWidth - visualLen);
+  return text + ' '.repeat(padding);
+}
+
 export interface EnvPresenter {
   formatBanner(): string;
   formatProfileList(profiles: Profile[], currentProfile: string | null): string;
@@ -84,25 +94,52 @@ class EnvPresenterImpl implements EnvPresenter {
 
   formatProfileList(profiles: Profile[], currentProfile: string | null): string {
     const lines: string[] = [];
-    lines.push('');
-    lines.push(`  ${bold('Profile:')} (${profiles.length} available)`);
-    lines.push('');
 
     if (profiles.length === 0) {
-      lines.push(`  ${dim('(use env-switcher create to add a profile)')}`);
+      lines.push('');
+      lines.push(`  ${dim('(no profiles available, use env-switcher create to add one)')}`);
       return lines.join('\n');
     }
 
+    const profileWidth = Math.max(
+      'PROFILE'.length,
+      ...profiles.map(p => p.name.length + 2)
+    );
+    const providerWidth = Math.max(
+      'PROVIDER'.length,
+      ...profiles.map(p => (p.description || 'Unknown').length)
+    );
+    const statusWidth = Math.max(
+      'STATUS'.length,
+      'ACTIVE'.length,
+      'Standby'.length
+    );
+    const apiKeyWidth = Math.max(
+      'API KEY'.length,
+      '[ ***** ]'.length,
+      '[ UNSET ]'.length
+    );
+
+    const divider = '  ' + '─'.repeat(profileWidth) + '  ' + '─'.repeat(providerWidth) + '  ' + '─'.repeat(statusWidth) + '  ' + '─'.repeat(apiKeyWidth);
+
+    lines.push(`  ENV-SWITCHER WORKSPACE CONFIGURATION`);
+    lines.push('');
+    lines.push(`  ${padVisualEnd(bold('PROFILE'), profileWidth)}  ${padVisualEnd(bold('PROVIDER'), providerWidth)}  ${padVisualEnd(bold('STATUS'), statusWidth)}  ${bold('API KEY')}`);
+    lines.push(divider);
+
     for (const profile of profiles) {
       const isActive = profile.name === currentProfile;
-      const marker = isActive ? green('[*]') : dim('[ ]');
-      const label = isActive ? bold(profile.name) : profile.name;
-      const suffix = isActive ? dim('  (current)') : '';
-      lines.push(`    ${marker} ${label}${suffix}`);
-      if (profile.description) {
-        lines.push(`        ${dim(profile.description)}`);
-      }
+      const status = isActive ? green('ACTIVE') : dim('Standby');
+      const apiKey = profile.env.ANTHROPIC_AUTH_TOKEN ? dim('[ ***** ]') : dim('[ UNSET ]');
+      const provider = profile.description || 'Unknown';
+
+      const marker = isActive ? green('>') : ' ';
+      const name = isActive ? bold(profile.name) : profile.name;
+
+      lines.push(`  ${padVisualEnd(`${marker} ${name}`, profileWidth)}  ${padVisualEnd(provider, providerWidth)}  ${padVisualEnd(status, statusWidth)}  ${apiKey}`);
     }
+
+    lines.push(divider);
 
     return lines.join('\n');
   }

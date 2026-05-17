@@ -129,12 +129,11 @@ describe('EnvPresenter', () => {
     it('should show empty state when no profiles', () => {
       const result = envPresenter.formatProfileList([], null);
 
-      expect(result).toContain('Profile:');
-      expect(result).toContain('available');
+      expect(result).toContain('no profiles available');
       expect(result).toContain('env-switcher create');
     });
 
-    it('should show current profile with [*] marker', () => {
+    it('should show current profile with > marker and ACTIVE status', () => {
       const profiles: Profile[] = [{
         name: 'minimax',
         description: 'MiniMax',
@@ -150,12 +149,13 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatProfileList(profiles, 'minimax');
 
-      expect(result).toContain('[*]');
+      expect(result).toContain('>');
       expect(result).toContain('minimax');
-      expect(result).toContain('(current)');
+      expect(result).toContain('ACTIVE');
+      expect(result).toContain('[ ***** ]');
     });
 
-    it('should show inactive profile with [ ] marker', () => {
+    it('should show inactive profile without > marker and with Standby status', () => {
       const profiles: Profile[] = [{
         name: 'minimax',
         description: 'MiniMax',
@@ -171,12 +171,12 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatProfileList(profiles, null);
 
-      expect(result).toContain('[ ]');
+      expect(result).not.toContain('> minimax');
+      expect(result).toContain('Standby');
       expect(result).toContain('minimax');
-      expect(result).not.toContain('(current)');
     });
 
-    it('should show profile details', () => {
+    it('should show profile details in table format', () => {
       const profiles: Profile[] = [{
         name: 'minimax',
         description: 'MiniMax API',
@@ -194,6 +194,10 @@ describe('EnvPresenter', () => {
 
       expect(result).toContain('minimax');
       expect(result).toContain('MiniMax API');
+      expect(result).toContain('PROFILE');
+      expect(result).toContain('PROVIDER');
+      expect(result).toContain('STATUS');
+      expect(result).toContain('API KEY');
     });
   });
 
