@@ -58,84 +58,45 @@ export function buildSwitchCommands(oldEnv: EnvConfig | null, newEnv: EnvConfig)
 class EnvPresenterImpl implements EnvPresenter {
   formatProfileList(profiles: Profile[], currentProfile: string | null): string {
     const lines: string[] = [];
-    lines.push('\x1b[34m=== Claude Code 环境配置 ===\x1b[0m');
+    lines.push(`配置列表 (共 ${profiles.length} 个)`);
     lines.push('');
 
     if (profiles.length === 0) {
-      lines.push('  (无配置文件)');
-      lines.push('');
-      lines.push('使用 \x1b[36menv-switcher create\x1b[0m 创建新配置');
+      lines.push('  使用 env-switcher create 创建新配置');
       return lines.join('\n');
     }
 
-    lines.push(`\x1b[32m当前配置: ${currentProfile || '未设置'}\x1b[0m`);
-    lines.push('');
-    lines.push('可用配置:');
-    lines.push('');
+    if (currentProfile) {
+      lines.push(`当前: ${currentProfile}`);
+    }
 
     for (const profile of profiles) {
       const isActive = profile.name === currentProfile;
-      const marker = isActive ? ' \x1b[32m*\x1b[0m ' : '   ';
-      lines.push(`${marker}\x1b[1m${profile.name}\x1b[0m`);
-      lines.push(`    描述: ${profile.description}`);
-      lines.push(`    URL: ${profile.env.ANTHROPIC_BASE_URL || 'N/A'}`);
-      lines.push(`    模型: ${profile.env.ANTHROPIC_MODEL || 'N/A'}`);
-      lines.push('');
+      const marker = isActive ? ' * ' : '   ';
+      lines.push(`${marker}${profile.name}`);
+      lines.push(`    ${profile.description || 'N/A'}`);
     }
-
-    lines.push(`共 ${profiles.length} 个配置`);
-    lines.push('');
-    lines.push('提示:');
-    lines.push('  \x1b[36menv-switcher switch\x1b[0m - 切换到其他配置');
-    lines.push('  \x1b[36menv-switcher edit\x1b[0m  - 编辑配置');
-    lines.push('  \x1b[36menv-switcher delete\x1b[0m - 删除配置');
 
     return lines.join('\n');
   }
 
-  formatCreateSuccess(profileName: string, profilePath: string): string {
-    return [
-      '',
-      `\x1b[32m✓\x1b[0m 配置 '${profileName}' 已创建`,
-      `  路径: ${profilePath}`,
-      '',
-      '\x1b[33m提示:\x1b[0m 运行 \x1b[36menv-switcher switch\x1b[0m 来激活此配置',
-    ].join('\n');
+  formatCreateSuccess(profileName: string, _profilePath: string): string {
+    return `✓ 配置 '${profileName}' 已创建`;
   }
 
-  formatSwitchSuccess(profileName: string, env: EnvConfig): string {
-    const exportCmd = buildExportCommands(env);
-    return [
-      '',
-      `\x1b[32m✓\x1b[0m 已切换到配置: \x1b[1m${profileName}\x1b[0m`,
-      '',
-      '\x1b[33m请在当前终端运行以下命令来应用环境变量:\x1b[0m',
-      '',
-      '\x1b[36m' + exportCmd + '\x1b[0m',
-      '',
-      '或使用以下快捷方式:',
-      '',
-      `\x1b[36m  eval $(env-switcher switch ${profileName})\x1b[0m`,
-    ].join('\n');
+  formatSwitchSuccess(profileName: string, _env: EnvConfig): string {
+    return `switched to: ${profileName}`;
   }
 
   formatDeleteSuccess(profileName: string, wasActive: boolean): string {
-    const lines: string[] = [];
-    lines.push('');
-    lines.push(`\x1b[32m✓\x1b[0m 配置 '${profileName}' 已删除`);
     if (wasActive) {
-      lines.push('\x1b[33m注意:\x1b[0m 您删除了当前激活的配置，请运行 \x1b[36menv-switcher switch\x1b[0m 选择新配置');
+      return `✓ 配置 '${profileName}' 已删除 (当前激活)`;
     }
-    return lines.join('\n');
+    return `✓ 配置 '${profileName}' 已删除`;
   }
 
   formatEditSuccess(profileName: string): string {
-    return [
-      '',
-      `\x1b[32m✓\x1b[0m 配置 '${profileName}' 已更新`,
-      '',
-      `\x1b[33m提示:\x1b[0m 如果此配置已激活，重新运行 \x1b[36menv-switcher switch\x1b[0m 来应用新配置`,
-    ].join('\n');
+    return `✓ 配置 '${profileName}' 已更新`;
   }
 
   formatError(message: string): string {

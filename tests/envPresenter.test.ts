@@ -119,8 +119,8 @@ describe('EnvPresenter', () => {
   describe('formatProfileList', () => {
     it('should show empty state when no profiles', () => {
       const result = envPresenter.formatProfileList([], null);
-      
-      expect(result).toContain('无配置文件');
+
+      expect(result).toContain('配置列表 (共 0 个)');
       expect(result).toContain('env-switcher create');
     });
 
@@ -137,10 +137,10 @@ describe('EnvPresenter', () => {
           ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku',
         },
       }];
-      
+
       const result = envPresenter.formatProfileList(profiles, 'minimax');
-      
-      expect(result).toContain('当前配置: minimax');
+
+      expect(result).toContain('当前: minimax');
       expect(result).toContain('*');
     });
 
@@ -157,10 +157,10 @@ describe('EnvPresenter', () => {
           ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku',
         },
       }];
-      
+
       const result = envPresenter.formatProfileList(profiles, null);
-      
-      expect(result).toContain('当前配置: 未设置');
+
+      expect(result).not.toContain('当前:');
     });
 
     it('should show profile details', () => {
@@ -176,13 +176,11 @@ describe('EnvPresenter', () => {
           ANTHROPIC_DEFAULT_HAIKU_MODEL: 'MiniMax-M2.7',
         },
       }];
-      
+
       const result = envPresenter.formatProfileList(profiles, null);
-      
+
       expect(result).toContain('minimax');
       expect(result).toContain('MiniMax API');
-      expect(result).toContain('https://api.minimaxi.com');
-      expect(result).toContain('MiniMax-M2.7');
     });
   });
 
@@ -199,10 +197,7 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatSwitchSuccess('test-profile', env);
 
-      expect(result).toContain('已切换到配置');
-      expect(result).toContain('test-profile');
-      expect(result).toContain('export ANTHROPIC_BASE_URL');
-      expect(result).toContain('eval');
+      expect(result).toContain('switched to: test-profile');
     });
   });
 
@@ -240,11 +235,10 @@ describe('EnvPresenter', () => {
   });
 
   describe('formatCreateSuccess', () => {
-    it('should include profile path in output', () => {
+    it('should include profile name in output', () => {
       const result = envPresenter.formatCreateSuccess('test-profile', '/path/to/test-profile.json');
 
       expect(result).toContain('test-profile');
-      expect(result).toContain('/path/to/test-profile.json');
       expect(result).toContain('已创建');
     });
   });
