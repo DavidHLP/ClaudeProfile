@@ -116,15 +116,16 @@ export async function selectExistingProfile(names: string[], currentProfile: str
   }
 
   const choices = names.map((name) => ({
-    name: name === currentProfile ? `${name} (当前)` : name,
+    name: name === currentProfile ? `[*] ${name}  (current)` : `[ ] ${name}`,
     value: name,
   }));
 
   const { selected } = await inquirer.prompt({
     type: 'list',
     name: 'selected',
-    message: '选择配置:',
+    message: 'Select profile:',
     choices,
+    loop: false,
   });
 
   return selected;

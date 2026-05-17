@@ -92,7 +92,8 @@ describe('Commands', () => {
       const result = await switchCommand({ profileName: 'test-profile' }, true);
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('switched to: test-profile');
+      expect(result.output).toContain('>> switched to:');
+      expect(result.output).toContain('test-profile');
     });
 
     it('should return error for non-existent profile', async () => {

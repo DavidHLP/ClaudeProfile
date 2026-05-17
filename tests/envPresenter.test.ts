@@ -3,6 +3,15 @@ import { envPresenter, buildExportCommands, buildSwitchCommands } from '../src/p
 import type { EnvConfig, Profile } from '../src/types/index.js';
 
 describe('EnvPresenter', () => {
+  describe('formatBanner', () => {
+    it('should return non-empty banner with ENV-SWITCHER title', () => {
+      const banner = envPresenter.formatBanner();
+      expect(banner.length).toBeGreaterThan(0);
+      expect(banner).toContain('ENV-SWITCHER');
+      expect(banner).toContain('+--');
+    });
+  });
+
   describe('buildExportCommands', () => {
     it('should generate export commands with single quotes', () => {
       const env: EnvConfig = {
@@ -120,11 +129,12 @@ describe('EnvPresenter', () => {
     it('should show empty state when no profiles', () => {
       const result = envPresenter.formatProfileList([], null);
 
-      expect(result).toContain('配置列表 (共 0 个)');
+      expect(result).toContain('Profile:');
+      expect(result).toContain('available');
       expect(result).toContain('env-switcher create');
     });
 
-    it('should show current profile marker', () => {
+    it('should show current profile with [*] marker', () => {
       const profiles: Profile[] = [{
         name: 'minimax',
         description: 'MiniMax',
@@ -140,11 +150,12 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatProfileList(profiles, 'minimax');
 
-      expect(result).toContain('当前: minimax');
-      expect(result).toContain('*');
+      expect(result).toContain('[*]');
+      expect(result).toContain('minimax');
+      expect(result).toContain('(current)');
     });
 
-    it('should show no current profile when unset', () => {
+    it('should show inactive profile with [ ] marker', () => {
       const profiles: Profile[] = [{
         name: 'minimax',
         description: 'MiniMax',
@@ -160,7 +171,9 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatProfileList(profiles, null);
 
-      expect(result).not.toContain('当前:');
+      expect(result).toContain('[ ]');
+      expect(result).toContain('minimax');
+      expect(result).not.toContain('(current)');
     });
 
     it('should show profile details', () => {
@@ -185,7 +198,7 @@ describe('EnvPresenter', () => {
   });
 
   describe('formatSwitchSuccess', () => {
-    it('should include export commands in output', () => {
+    it('should include switched to message with profile name', () => {
       const env: EnvConfig = {
         ANTHROPIC_BASE_URL: 'https://api.test.com',
         ANTHROPIC_AUTH_TOKEN: 'token',
@@ -197,7 +210,10 @@ describe('EnvPresenter', () => {
 
       const result = envPresenter.formatSwitchSuccess('test-profile', env);
 
-      expect(result).toContain('switched to: test-profile');
+      expect(result).toContain('>>');
+      expect(result).toContain('switched to:');
+      expect(result).toContain('test-profile');
+      expect(result).toContain('synced');
     });
   });
 

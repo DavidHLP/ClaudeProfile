@@ -23,7 +23,7 @@ export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = 
 }
 
 export async function switchCommandInteractive(): Promise<CommandResult> {
-  const { selectExistingProfile, confirmAction } = await import('../ui/prompt.js');
+  const { selectExistingProfile } = await import('../ui/prompt.js');
 
   const profiles = profileService.listProfiles();
   if (profiles.length === 0) {
@@ -31,6 +31,12 @@ export async function switchCommandInteractive(): Promise<CommandResult> {
   }
 
   const currentProfile = profileService.getCurrentProfile();
+
+  // 输出 banner 和 profile 列表
+  console.log(envPresenter.formatBanner());
+  console.log();
+  console.log(envPresenter.formatProfileList(profiles, currentProfile));
+  console.log();
 
   // 如果只有一个配置且已是当前配置，仍执行 sync 确保settings.json一致
   if (profiles.length === 1 && profiles[0].name === currentProfile) {
