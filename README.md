@@ -1,6 +1,6 @@
-# @claude-code/env-switcher
+# ClaudeProfile
 
-Claude Code 环境切换器 - 交互式管理多 API 配置
+Claude Code 配置文件管理器 - 交互式管理多 API 配置
 
 ## 功能
 
@@ -15,7 +15,7 @@ Claude Code 环境切换器 - 交互式管理多 API 配置
 ### 从 npm 安装（全局）
 
 ```bash
-npm install -g @claude-code/env-switcher
+npm install -g @claude-code/claude-profile
 ```
 
 ### 本地开发
@@ -39,14 +39,14 @@ npm link
 ### 1. 初始化 Shell Hook（只需一次）
 
 ```bash
-echo 'source <(env-switcher init)' >> ~/.bashrc
+echo 'source <(claude-profile init)' >> ~/.bashrc
 source ~/.bashrc
 ```
 
 ### 2. 创建配置
 
 ```bash
-env-switcher create
+claude-profile create
 ```
 
 交互式引导：
@@ -60,10 +60,10 @@ env-switcher create
 
 ```bash
 # 交互式选择（需要终端环境）
-env-switcher switch
+claude-profile switch
 
 # 直接指定配置
-env-switcher switch minimax
+claude-profile switch minimax
 ```
 
 两种方式都会自动应用环境变量并同步到 Claude Code settings！
@@ -73,45 +73,45 @@ env-switcher switch minimax
 ### 创建新配置
 
 ```bash
-env-switcher create
+claude-profile create
 ```
 
 ### 切换配置
 
 ```bash
 # 交互式选择（仅在终端中可用）
-env-switcher switch
+claude-profile switch
 
 # 直接指定配置
-env-switcher switch minimax
+claude-profile switch minimax
 ```
 
 ### 列出所有配置
 
 ```bash
-env-switcher list
+claude-profile list
 ```
 
 ### 编辑配置
 
 ```bash
-env-switcher edit
+claude-profile edit
 ```
 
 ### 删除配置
 
 ```bash
-env-switcher delete
+claude-profile delete
 ```
 
 ### 导出配置
 
 ```bash
 # 导出指定配置
-env-switcher export minimax
+claude-profile export minimax
 
 # 导出当前配置
-env-switcher export --current
+claude-profile export --current
 ```
 
 ## Claude Code 集成
@@ -128,22 +128,22 @@ env-switcher export --current
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | Haiku 模型 |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | 子代理模型 |
 
-这使得 env-switcher 可以同时管理：
+这使得 claude-profile 可以同时管理：
 - **Shell 环境变量**：用于 CLI 中的 API 调用
 - **Claude Code 设置**：用于 VSCode/Zed 中的 Claude Code 扩展
 
 ## 工作原理
 
-Shell hook 会在你的 shell 中创建一个 `env-switcher` 函数，拦截 `switch` 命令并自动 `eval` 导出的环境变量。
+Shell hook 会在你的 shell 中创建一个 `claude-profile` 函数，拦截 `switch` 命令并自动 `eval` 导出的环境变量。
 
-- `env-switcher switch <profile>` - 直接切换，自动应用环境变量
-- `env-switcher switch` - 交互式选择（仅在终端环境中可用）
+- `claude-profile switch <profile>` - 直接切换，自动应用环境变量
+- `claude-profile switch` - 交互式选择（仅在终端环境中可用）
 
 ## 配置文件
 
 ### 存储位置
 
-- **Profiles**: `~/.config/env-switcher/`
+- **Profiles**: `~/.config/claude-profile/`
 - **Claude Code settings**: `~/.claude/settings.json`
 
 ### 配置文件格式
@@ -166,8 +166,8 @@ Shell hook 会在你的 shell 中创建一个 `env-switcher` 函数，拦截 `sw
 
 ## 更新 Shell Hook
 
-如果更新了 env-switcher 后遇到问题，重新加载 shell hook：
+如果更新了 claude-profile 后遇到问题，重新加载 shell hook：
 
 ```bash
-source <(env-switcher init)
+source <(claude-profile init)
 ```
