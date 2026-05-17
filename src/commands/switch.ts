@@ -1,4 +1,5 @@
 import { profileService } from '../services/profileService.js';
+import { settingsSyncService } from '../services/settingsSyncService.js';
 import { envPresenter, buildSwitchCommands } from '../presenters/envPresenter.js';
 import { SwitchProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
@@ -11,6 +12,7 @@ export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = 
 
     const profile = profileService.getProfile(input.profileName);
     profileService.setCurrentProfile(input.profileName);
+    settingsSyncService.syncOnSwitch(oldEnv, profile.env);
 
     if (isTTY) {
       return { success: true, output: envPresenter.formatSwitchSuccess(input.profileName, profile.env) };
@@ -30,12 +32,9 @@ export async function switchCommandInteractive(): Promise<CommandResult> {
 
   const currentProfile = profileService.getCurrentProfile();
 
-  // 如果只有一个配置且已是当前配置，无需切换
+  // 如果只有一个配置且已是当前配置，仍执行 sync 确保settings.json一致
   if (profiles.length === 1 && profiles[0].name === currentProfile) {
-    return {
-      success: true,
-      output: `已是当前配置: ${currentProfile}，无需切换。`,
-    };
+    return switchCommand({ profileName: currentProfile });
   }
 
   const selectedName = await selectExistingProfile(
@@ -47,12 +46,9 @@ export async function switchCommandInteractive(): Promise<CommandResult> {
     return { success: false, error: '已取消切换。', wasCancelled: true };
   }
 
-  // 如果选择的就是当前配置，无需切换
+  // 如果选择的就是当前配置，仍执行 sync 确保settings.json一致
   if (selectedName === currentProfile) {
-    return {
-      success: true,
-      output: `已是当前配置: ${currentProfile}，无需切换。`,
-    };
+    return switchCommand({ profileName: selectedName });
   }
 
   // Save old profile name for diff in export --current

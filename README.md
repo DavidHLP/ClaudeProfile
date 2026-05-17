@@ -8,6 +8,7 @@ Claude Code 环境切换器 - 交互式管理多 API 配置
 - 支持多个 Provider: MiniMax、Kimi (Moonshot)、阿里云百炼、火山引擎等
 - 密码式 Token 输入，安全可靠
 - 无缝切换环境变量，一条命令完成配置
+- **自动同步到 Claude Code settings.json**（支持 VSCode 和 Zed 扩展）
 
 ## 安装
 
@@ -65,7 +66,7 @@ env-switcher switch
 env-switcher switch minimax
 ```
 
-两种方式都会自动应用环境变量，无需手动 `eval`！
+两种方式都会自动应用环境变量并同步到 Claude Code settings！
 
 ## 使用方法
 
@@ -113,6 +114,24 @@ env-switcher export minimax
 env-switcher export --current
 ```
 
+## Claude Code 集成
+
+切换配置时会自动同步以下环境变量到 `~/.claude/settings.json`：
+
+| 环境变量 | 说明 |
+|---------|------|
+| `ANTHROPIC_BASE_URL` | API 基础地址 |
+| `ANTHROPIC_AUTH_TOKEN` | API 认证 Token |
+| `ANTHROPIC_MODEL` | 默认模型 |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Sonnet 模型 |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | Opus 模型 |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | Haiku 模型 |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | 子代理模型 |
+
+这使得 env-switcher 可以同时管理：
+- **Shell 环境变量**：用于 CLI 中的 API 调用
+- **Claude Code 设置**：用于 VSCode/Zed 中的 Claude Code 扩展
+
 ## 工作原理
 
 Shell hook 会在你的 shell 中创建一个 `env-switcher` 函数，拦截 `switch` 命令并自动 `eval` 导出的环境变量。
@@ -120,9 +139,14 @@ Shell hook 会在你的 shell 中创建一个 `env-switcher` 函数，拦截 `sw
 - `env-switcher switch <profile>` - 直接切换，自动应用环境变量
 - `env-switcher switch` - 交互式选择（仅在终端环境中可用）
 
-配置存储在 `~/project/C-Link/env-profiles/` 目录。
+## 配置文件
 
-## 配置文件格式
+### 存储位置
+
+- **Profiles**: `~/.config/env-switcher/`
+- **Claude Code settings**: `~/.claude/settings.json`
+
+### 配置文件格式
 
 ```json
 {
@@ -134,7 +158,8 @@ Shell hook 会在你的 shell 中创建一个 `env-switcher` 函数，拦截 `sw
     "ANTHROPIC_MODEL": "MiniMax-M2.7",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M2.7",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M2.7",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2.7"
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2.7",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "MiniMax-M2.7"
   }
 }
 ```

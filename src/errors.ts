@@ -36,3 +36,10 @@ export class FileOperationError extends AppError {
     this.name = 'FileOperationError';
   }
 }
+
+export class SettingsFileCorruptError extends AppError {
+  constructor(filePath: string, cause: unknown) {
+    super(`Claude settings 文件格式错误: ${filePath}`, 'SETTINGS_FILE_CORRUPT', { filePath, cause });
+    this.name = 'SettingsFileCorruptError';
+  }
+}

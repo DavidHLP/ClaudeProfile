@@ -17,3 +17,9 @@ export { buildExportCommands, buildSwitchCommands } from './presenters/envPresen
 export type { ConfigStore } from './config/configStore.js';
 export { FileSystemConfigStore } from './config/fileSystemConfigStore.js';
 export { InMemoryConfigStore } from './config/inMemoryConfigStore.js';
+
+export type { ClaudeSettingsStore } from './config/claudeSettingsStore.js';
+export { ClaudeSettingsStoreImpl } from './config/claudeSettingsStore.js';
+export { computeSettingsEnv, MANAGED_SETTINGS_KEYS } from './engine/settingsSync.js';
+export type { SettingsSyncService } from './services/settingsSyncService.js';
+export { SettingsSyncServiceImpl, settingsSyncService } from './services/settingsSyncService.js';

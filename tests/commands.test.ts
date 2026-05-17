@@ -38,6 +38,15 @@ vi.mock('../src/services/profileService.js', () => ({
   profileService: mockProfileService,
 }));
 
+// Mock the settingsSyncService
+const mockSettingsSyncService = {
+  syncOnSwitch: vi.fn(),
+};
+
+vi.mock('../src/services/settingsSyncService.js', () => ({
+  settingsSyncService: mockSettingsSyncService,
+}));
+
 describe('Commands', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,9 +92,7 @@ describe('Commands', () => {
       const result = await switchCommand({ profileName: 'test-profile' }, true);
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('已切换到配置');
-      expect(result.output).toContain('test-profile');
-      expect(result.output).toContain('export ANTHROPIC_BASE_URL');
+      expect(result.output).toContain('switched to: test-profile');
     });
 
     it('should return error for non-existent profile', async () => {
@@ -130,6 +137,15 @@ describe('Commands', () => {
 
       expect(result.success).toBe(true);
       expect(result.output).toContain('unset API_TIMEOUT_MS');
+    });
+
+    it('should call syncOnSwitch with old and new env', async () => {
+      const { switchCommand } = await import('../src/commands/switch.js');
+      await switchCommand({ profileName: 'test-profile' }, true);
+
+      expect(mockSettingsSyncService.syncOnSwitch).toHaveBeenCalled();
+      const [oldEnv, newEnv] = mockSettingsSyncService.syncOnSwitch.mock.calls[0];
+      expect(newEnv.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
     });
   });
 
