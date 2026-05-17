@@ -30,7 +30,7 @@
     "@types/inquirer": "^9.0.0",
     "@types/node": "^20.0.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=18.0.0"
