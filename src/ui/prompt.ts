@@ -1,5 +1,6 @@
 import inquirer from 'inquirer';
 import { ProviderTemplate, Profile } from '../types/index.js';
+import { icon } from './theme.js';
 
 async function promptInput(options: {
   message: string;
@@ -110,29 +111,6 @@ export async function confirmAction(message: string): Promise<boolean> {
   return confirm;
 }
 
-export async function selectExistingProfile(names: string[], currentProfile: string | null): Promise<string | null> {
-  if (names.length === 0) {
-    return null;
-  }
-
-  const choices = names.map((name) => ({
-    name,
-    value: name,
-  }));
-
-  const currentIndex = currentProfile ? names.indexOf(currentProfile) : 0;
-
-  const { selected } = await inquirer.prompt({
-    type: 'list',
-    name: 'selected',
-    message: 'Select profile:',
-    choices,
-    default: currentIndex >= 0 ? currentIndex : 0,
-  });
-
-  return selected;
-}
-
 export async function selectProfileFromList(profiles: Profile[], currentProfile: string | null): Promise<string | null> {
   if (profiles.length === 0) {
     return null;
@@ -140,11 +118,11 @@ export async function selectProfileFromList(profiles: Profile[], currentProfile:
 
   const choices = profiles.map((p) => {
     const isActive = p.name === currentProfile;
-    const status = isActive ? 'ACTIVE' : 'Standby';
+    const statusIcon = isActive ? icon.active : icon.standby;
     const provider = p.description || 'Unknown';
     const apiKey = p.env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]';
     return {
-      name: `${p.name} — ${provider} (${status}) ${apiKey}`,
+      name: `${statusIcon} ${p.name} — ${provider} ${apiKey}`,
       value: p.name,
     };
   });
@@ -154,7 +132,7 @@ export async function selectProfileFromList(profiles: Profile[], currentProfile:
   const { selected } = await inquirer.prompt({
     type: 'list',
     name: 'selected',
-    message: 'Select profile:',
+    message: '请选择配置:',
     choices,
     default: currentIndex >= 0 ? currentIndex : 0,
   });

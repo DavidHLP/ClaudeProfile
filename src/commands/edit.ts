@@ -1,4 +1,3 @@
-import { EnvConfig } from '../types/index.js';
 import { profileService } from '../services/profileService.js';
 import { envPresenter } from '../presenters/envPresenter.js';
 import { EditProfileInput, CommandResult } from '../types/command.js';
@@ -22,7 +21,7 @@ export async function editCommand(input: EditProfileInput): Promise<CommandResul
 }
 
 export async function editCommandInteractive(): Promise<CommandResult> {
-  const { selectExistingProfile, inputApiToken, inputBaseUrl, inputSonnetModel, inputOpusModel, inputHaikuModel } = await import('../ui/prompt.js');
+  const { selectProfileFromList, inputApiToken, inputBaseUrl, inputSonnetModel, inputOpusModel, inputHaikuModel } = await import('../ui/prompt.js');
 
   const profiles = profileService.listProfiles();
   if (profiles.length === 0) {
@@ -30,10 +29,7 @@ export async function editCommandInteractive(): Promise<CommandResult> {
   }
 
   const currentProfile = profileService.getCurrentProfile();
-  const selectedName = await selectExistingProfile(
-    profiles.map((p) => p.name),
-    currentProfile
-  );
+  const selectedName = await selectProfileFromList(profiles, currentProfile);
 
   if (!selectedName) {
     return { success: false, error: '已取消编辑。', wasCancelled: true };

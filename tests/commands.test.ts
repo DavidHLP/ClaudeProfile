@@ -92,7 +92,7 @@ describe('Commands', () => {
       const result = await switchCommand({ profileName: 'test-profile' }, true);
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('>> switched to:');
+      expect(result.output).toContain('已切换到');
       expect(result.output).toContain('test-profile');
     });
 
@@ -271,8 +271,8 @@ describe('Commands', () => {
       const result = await initCommand();
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('env-switcher()');
-      expect(result.output).toContain('_env_switcher_bin()');
+      expect(result.output).toContain('claude-profile()');
+      expect(result.output).toContain('_claude_profile_bin()');
     });
 
     it('should include switch command handler', async () => {
@@ -297,8 +297,8 @@ describe('Commands', () => {
       const result = await initCommand();
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('ENV_SWITCHER_BIN');
-      expect(result.output).toContain('unset -f env-switcher');
+      expect(result.output).toContain('CLAUDE_PROFILE_BIN');
+      expect(result.output).toContain('unset -f claude-profile');
     });
 
     it('should use switch command for non-interactive profile switch', async () => {

@@ -1,33 +1,5 @@
 import { EnvConfig, Profile } from '../types/index.js';
-
-// ANSI style constants
-const styles = {
-  reset: '\x1b[0m',
-  bold: '\x1b[1m',
-  dim: '\x1b[2m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-  white: '\x1b[37m',
-};
-
-// Style helper functions
-const s = (style: string, text: string): string => `${style}${text}${styles.reset}`;
-const bold = (text: string): string => s(styles.bold, text);
-const green = (text: string): string => s(styles.green, text);
-const dim = (text: string): string => s(styles.dim, text);
-
-function stripAnsi(text: string): string {
-  return text.replace(/\x1b\[[0-9;]*m/g, '');
-}
-
-function padVisualEnd(text: string, targetWidth: number): string {
-  const visualLen = stripAnsi(text).length;
-  const padding = Math.max(0, targetWidth - visualLen);
-  return text + ' '.repeat(padding);
-}
+import { theme, icon, padVisualEnd, box } from '../ui/theme.js';
 
 export interface EnvPresenter {
   formatBanner(): string;
@@ -37,6 +9,7 @@ export interface EnvPresenter {
   formatDeleteSuccess(profileName: string, wasActive: boolean): string;
   formatEditSuccess(profileName: string): string;
   formatError(message: string): string;
+  formatWarning(message: string): string;
   formatNoProfiles(): string;
   formatCancel(message: string): string;
 }
@@ -87,9 +60,14 @@ export function buildSwitchCommands(oldEnv: EnvConfig | null, newEnv: EnvConfig)
 
 class EnvPresenterImpl implements EnvPresenter {
   formatBanner(): string {
-    return `+----------------------------------+
-|       ENV-SWITCHER               |
-+----------------------------------+`;
+    const title = '环境切换器';
+    const innerWidth = 30;
+    const titlePad = Math.max(0, innerWidth - title.length);
+    const padLeft = Math.floor(titlePad / 2);
+    const padRight = titlePad - padLeft;
+    return `${box.tl}${box.h.repeat(innerWidth + 2)}${box.tr}
+${box.v}${' '.repeat(padLeft + 1)}${theme.bold(title)}${' '.repeat(padRight + 1)}${box.v}
+${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
   }
 
   formatProfileList(profiles: Profile[], currentProfile: string | null): string {
@@ -97,82 +75,91 @@ class EnvPresenterImpl implements EnvPresenter {
 
     if (profiles.length === 0) {
       lines.push('');
-      lines.push(`  ${dim('(no profiles available, use env-switcher create to add one)')}`);
+      lines.push(`  ${theme.dim('(没有可用的配置，请使用 claude-profile create 添加)')}`);
       return lines.join('\n');
     }
 
     const profileWidth = Math.max(
       'PROFILE'.length,
-      ...profiles.map(p => p.name.length + 2)
+      ...profiles.map(p => p.name.length + 2),
     );
     const providerWidth = Math.max(
       'PROVIDER'.length,
-      ...profiles.map(p => (p.description || 'Unknown').length)
+      ...profiles.map(p => (p.description || 'Unknown').length),
     );
     const statusWidth = Math.max(
       'STATUS'.length,
-      'ACTIVE'.length,
-      'Standby'.length
+      '已激活'.length,
+      '待命'.length,
     );
     const apiKeyWidth = Math.max(
       'API KEY'.length,
       '[ ***** ]'.length,
-      '[ UNSET ]'.length
+      '[ UNSET ]'.length,
     );
 
-    const divider = '  ' + '─'.repeat(profileWidth) + '  ' + '─'.repeat(providerWidth) + '  ' + '─'.repeat(statusWidth) + '  ' + '─'.repeat(apiKeyWidth);
+    const innerWidth = profileWidth + providerWidth + statusWidth + apiKeyWidth + 6;
+    const topLine = `  ${box.tl}${box.h.repeat(innerWidth)}${box.tr}`;
+    const headerLine = `  ${box.v} ${padVisualEnd(theme.bold('PROFILE'), profileWidth)} ${padVisualEnd(theme.bold('PROVIDER'), providerWidth)} ${padVisualEnd(theme.bold('STATUS'), statusWidth)} ${theme.bold('API KEY')} ${box.v}`;
+    const sepLine = `  ${box.lj}${box.h.repeat(innerWidth)}${box.rj}`;
 
-    lines.push(`  ENV-SWITCHER WORKSPACE CONFIGURATION`);
     lines.push('');
-    lines.push(`  ${padVisualEnd(bold('PROFILE'), profileWidth)}  ${padVisualEnd(bold('PROVIDER'), providerWidth)}  ${padVisualEnd(bold('STATUS'), statusWidth)}  ${bold('API KEY')}`);
-    lines.push(divider);
+    lines.push(topLine);
+    lines.push(headerLine);
+    lines.push(sepLine);
 
     for (const profile of profiles) {
       const isActive = profile.name === currentProfile;
-      const status = isActive ? green('ACTIVE') : dim('Standby');
-      const apiKey = profile.env.ANTHROPIC_AUTH_TOKEN ? dim('[ ***** ]') : dim('[ UNSET ]');
+      const status = isActive ? theme.active('已激活') : theme.standby('待命');
+      const apiKey = profile.env.ANTHROPIC_AUTH_TOKEN ? theme.dim('[ ***** ]') : theme.dim('[ UNSET ]');
       const provider = profile.description || 'Unknown';
 
-      const marker = isActive ? green('>') : ' ';
-      const name = isActive ? bold(profile.name) : profile.name;
+      const marker = isActive ? icon.active : icon.standby;
+      const name = isActive ? theme.bold(profile.name) : profile.name;
 
-      lines.push(`  ${padVisualEnd(`${marker} ${name}`, profileWidth)}  ${padVisualEnd(provider, providerWidth)}  ${padVisualEnd(status, statusWidth)}  ${apiKey}`);
+      lines.push(`  ${box.v} ${padVisualEnd(`${marker} ${name}`, profileWidth)} ${padVisualEnd(provider, providerWidth)} ${padVisualEnd(status, statusWidth)} ${apiKey} ${box.v}`);
     }
 
-    lines.push(divider);
+    const bottomLine = `  ${box.bl}${box.h.repeat(innerWidth)}${box.br}`;
+    lines.push(bottomLine);
+    lines.push('');
 
     return lines.join('\n');
   }
 
   formatCreateSuccess(profileName: string, _profilePath: string): string {
-    return `${green('✓')} 配置 '${profileName}' 已创建`;
+    return `${icon.success} 配置 '${profileName}' 已创建`;
   }
 
   formatSwitchSuccess(profileName: string, _env: EnvConfig): string {
     return `
-  >> switched to: ${bold(green(profileName))}
+  ${icon.arrow} 已切换到: ${theme.active(profileName)}
 
-  ${dim('(environment variables synced)')}
+  ${theme.dim('(环境变量已同步)')}
 `;
   }
 
   formatDeleteSuccess(profileName: string, wasActive: boolean): string {
     if (wasActive) {
-      return `${green('✓')} 配置 '${profileName}' 已删除 ${dim('(当前激活)')}`;
+      return `${icon.success} 配置 '${profileName}' 已删除 ${theme.dim('(当前激活)')}`;
     }
-    return `${green('✓')} 配置 '${profileName}' 已删除`;
+    return `${icon.success} 配置 '${profileName}' 已删除`;
   }
 
   formatEditSuccess(profileName: string): string {
-    return `${green('✓')} 配置 '${profileName}' 已更新`;
+    return `${icon.success} 配置 '${profileName}' 已更新`;
   }
 
   formatError(message: string): string {
-    return `\x1b[31m错误:\x1b[0m ${message}`;
+    return `${theme.error('错误:')} ${message}`;
+  }
+
+  formatWarning(message: string): string {
+    return `${theme.warning('警告:')} ${message}`;
   }
 
   formatNoProfiles(): string {
-    return '没有可用的配置。请先使用 \x1b[36menv-switcher create\x1b[0m 创建配置。';
+    return `没有可用的配置。请先使用 ${theme.info('claude-profile create')} 创建配置。`;
   }
 
   formatCancel(message: string): string {
