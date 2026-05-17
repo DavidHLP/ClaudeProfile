@@ -225,15 +225,12 @@ describe('Commands', () => {
   });
 
   describe('editCommand', () => {
-    it('should update profile with new values', async () => {
+    it('should update only the specified field', async () => {
       const { editCommand } = await import('../src/commands/edit.js');
       const result = await editCommand({
         profileName: 'test-profile',
-        token: 'updated-token',
-        baseUrl: 'https://api.updated.com',
-        sonnetModel: 'updated-sonnet',
-        opusModel: 'updated-opus',
-        haikuModel: 'updated-haiku',
+        field: 'token',
+        value: 'updated-token',
       });
 
       expect(result.success).toBe(true);
@@ -241,8 +238,56 @@ describe('Commands', () => {
 
       const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
       expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('updated-token');
+    });
+
+    it('should leave other env fields unchanged when editing one field', async () => {
+      const { editCommand } = await import('../src/commands/edit.js');
+      const result = await editCommand({
+        profileName: 'test-profile',
+        field: 'baseUrl',
+        value: 'https://api.updated.com',
+      });
+
+      expect(result.success).toBe(true);
+
+      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
       expect(savedProfile.env.ANTHROPIC_BASE_URL).toBe('https://api.updated.com');
+      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('test-model');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('test-sonnet');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('test-opus');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('test-haiku');
+    });
+
+    it('should sync ANTHROPIC_MODEL and ANTHROPIC_DEFAULT_SONNET_MODEL when editing sonnetModel', async () => {
+      const { editCommand } = await import('../src/commands/edit.js');
+      const result = await editCommand({
+        profileName: 'test-profile',
+        field: 'sonnetModel',
+        value: 'updated-sonnet',
+      });
+
+      expect(result.success).toBe(true);
+
+      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
       expect(savedProfile.env.ANTHROPIC_MODEL).toBe('updated-sonnet');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('updated-sonnet');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('test-opus');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('test-haiku');
+    });
+
+    it('should not mutate the original profile object', async () => {
+      const original = createMockProfile();
+      mockProfileService.getProfile.mockReturnValueOnce(original);
+
+      const { editCommand } = await import('../src/commands/edit.js');
+      await editCommand({
+        profileName: 'test-profile',
+        field: 'token',
+        value: 'updated-token',
+      });
+
+      expect(original.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
     });
 
     it('should return error for non-existent profile', async () => {
@@ -253,11 +298,8 @@ describe('Commands', () => {
       const { editCommand } = await import('../src/commands/edit.js');
       const result = await editCommand({
         profileName: 'non-existent',
-        token: 'token',
-        baseUrl: 'https://api.test.com',
-        sonnetModel: 'model',
-        opusModel: 'model',
-        haikuModel: 'model',
+        field: 'token',
+        value: 'token',
       });
 
       expect(result.success).toBe(false);

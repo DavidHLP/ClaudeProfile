@@ -1,5 +1,3 @@
-import { EnvConfig } from './index.js';
-
 export interface ProfileCredentialsInput {
   token: string;
   baseUrl: string;
@@ -13,8 +11,25 @@ export interface CreateProfileInput extends ProfileCredentialsInput {
   profileName: string;
 }
 
-export interface EditProfileInput extends ProfileCredentialsInput {
+export type EditableField =
+  | 'token'
+  | 'baseUrl'
+  | 'sonnetModel'
+  | 'opusModel'
+  | 'haikuModel';
+
+export const EDITABLE_FIELD_LABELS: Record<EditableField, string> = {
+  token: 'API Token',
+  baseUrl: 'API Base URL',
+  sonnetModel: 'SONNET 模型',
+  opusModel: 'OPUS 模型',
+  haikuModel: 'HAIKU 模型',
+};
+
+export interface EditProfileInput {
   profileName: string;
+  field: EditableField;
+  value: string;
 }
 
 export interface SwitchProfileInput {

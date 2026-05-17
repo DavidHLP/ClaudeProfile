@@ -1,4 +1,5 @@
 import { EnvConfig, Profile } from '../types/index.js';
+import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
 import { theme, icon, padVisualEnd, box } from '../ui/theme.js';
 
 export interface EnvPresenter {
@@ -7,7 +8,7 @@ export interface EnvPresenter {
   formatCreateSuccess(profileName: string, profilePath: string): string;
   formatSwitchSuccess(profileName: string, env: EnvConfig): string;
   formatDeleteSuccess(profileName: string, wasActive: boolean): string;
-  formatEditSuccess(profileName: string): string;
+  formatEditSuccess(profileName: string, field?: EditableField): string;
   formatError(message: string): string;
   formatWarning(message: string): string;
   formatNoProfiles(): string;
@@ -146,8 +147,11 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
     return `${icon.success} 配置 '${profileName}' 已删除`;
   }
 
-  formatEditSuccess(profileName: string): string {
-    return `${icon.success} 配置 '${profileName}' 已更新`;
+  formatEditSuccess(profileName: string, field?: EditableField): string {
+    if (!field) {
+      return `${icon.success} 配置 '${profileName}' 已更新`;
+    }
+    return `${icon.success} 已更新 ${theme.bold(profileName)} 的 ${theme.info(EDITABLE_FIELD_LABELS[field])}`;
   }
 
   formatError(message: string): string {
