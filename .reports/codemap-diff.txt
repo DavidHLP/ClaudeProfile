@@ -1,0 +1,62 @@
+Codemap Analysis Report
+Generated: 2026-05-18
+
+================================================================================
+FILES ANALYZED
+================================================================================
+
+Source files: 26 TypeScript files
+Config files: package.json, tsconfig.json, vitest.config.ts
+Entry point: bin/claude-profile.js
+
+================================================================================
+ARCHITECTURE SUMMARY
+================================================================================
+
+Type: Single CLI tool (Node.js/TypeScript)
+Monorepo: No
+Build output: dist/
+Test framework: Vitest
+
+================================================================================
+SOURCE STRUCTURE
+================================================================================
+
+src/
+├── commands/     (7 files) - CLI command handlers
+├── config/        (4 files) - ConfigStore interface + implementations
+├── engine/        (2 files) - Settings sync + shell activation
+├── presenters/    (1 file)  - EnvPresenter (ANSI table rendering)
+├── services/      (2 files) - ProfileService, SettingsSyncService
+├── templates/     (1 file)  - Provider templates (MiniMax, Kimi, etc.)
+├── types/         (2 files) - Type definitions
+├── ui/            (2 files) - Theme + prompt utilities
+├── errors.ts      (1 file)  - Custom error hierarchy
+└── index.ts       (1 file)  - Library exports
+
+================================================================================
+NEW DEPENDENCIES DETECTED
+================================================================================
+
+None - all dependencies are already declared in package.json
+
+================================================================================
+CHANGES SINCE LAST SCAN
+================================================================================
+
+Initial codemap generation - no previous scan exists.
+
+================================================================================
+CODEMAP FILES CREATED
+================================================================================
+
+docs/CODEMAPS/
+├── architecture.md  (~600 tokens) - System overview, data flow, key domains
+├── backend.md       (~500 tokens) - Command routing, service interfaces
+└── dependencies.md  (~300 tokens) - External services, third-party packages
+
+================================================================================
+STALENESS WARNINGS
+================================================================================
+
+None - initial generation.
