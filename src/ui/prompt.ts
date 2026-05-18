@@ -3,7 +3,7 @@ import { ProviderTemplate, Profile } from '../types/index.js';
 import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
 import { icon, theme, padVisualEnd, stripAnsi } from './theme.js';
 
-async function promptInput(options: {
+export async function promptInput(options: {
   message: string;
   default?: string;
   validate?: (input: string) => string | true;
@@ -44,6 +44,18 @@ export async function inputProfileName(defaultName: string): Promise<string> {
       return true;
     },
   });
+}
+
+export async function promptForNewName(defaultName: string): Promise<string | null> {
+  return promptInput({
+    message: '新名称:',
+    default: defaultName,
+    validate: (input: string) => {
+      if (!input.trim()) return '名称不能为空';
+      if (!/^[a-zA-Z0-9-_]+$/.test(input)) return '名称只能包含字母、数字、- 和 _';
+      return true;
+    },
+  }).catch(() => null);
 }
 
 export async function inputApiToken(): Promise<string> {
@@ -182,4 +194,23 @@ export async function selectEditField(profile: Profile): Promise<EditableField |
   });
 
   return field as EditableField | null;
+}
+
+export async function selectBackup(backups: { name: string; path: string; date: Date }[]): Promise<string | null> {
+  const choices = backups.map((b) => {
+    const dateStr = b.date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    return {
+      name: `${b.name} - ${theme.dim(dateStr)}`,
+      value: b.path,
+    };
+  });
+
+  const { selected } = await inquirer.prompt({
+    type: 'list',
+    name: 'selected',
+    message: '请选择要恢复的备份:',
+    choices,
+  });
+
+  return selected;
 }

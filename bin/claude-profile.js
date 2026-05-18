@@ -5,7 +5,11 @@ import { editCommandInteractive } from '../dist/commands/edit.js';
 import { deleteCommand, deleteCommandInteractive } from '../dist/commands/delete.js';
 import { listCommand } from '../dist/commands/list.js';
 import { switchCommand, switchCommandInteractive } from '../dist/commands/switch.js';
-import { exportCommand, exportCurrentCommand } from '../dist/commands/export.js';
+import { exportCommand, exportCurrentCommand, exportFileCommand, exportCurrentFileCommand } from '../dist/commands/export.js';
+import { importFileCommand, importFileCommandInteractive } from '../dist/commands/import.js';
+import { renameCommand, renameCommandInteractive } from '../dist/commands/rename.js';
+import { duplicateCommand, duplicateCommandInteractive } from '../dist/commands/duplicate.js';
+import { backupCommand, restoreCommand, restoreCommandInteractive } from '../dist/commands/backup.js';
 import { initCommand } from '../dist/commands/init.js';
 
 let result;
@@ -43,11 +47,70 @@ async function main() {
       }
       break;
 
+    case 'rename':
+      if (args.length >= 3) {
+        result = await renameCommand({ oldName: args[1], newName: args[2] });
+      } else if (args.length === 2) {
+        result = await renameCommandInteractive();
+      } else {
+        result = { success: false, error: '用法: claude-profile rename <旧名称> <新名称>' };
+      }
+      break;
+
+    case 'duplicate':
+      if (args.length >= 3) {
+        result = await duplicateCommand({ sourceName: args[1], newName: args[2] });
+      } else if (args.length === 2) {
+        result = await duplicateCommandInteractive();
+      } else {
+        result = { success: false, error: '用法: claude-profile duplicate <源名称> <新名称>' };
+      }
+      break;
+
     case 'export':
-      if (args.includes('--current')) {
+      if (args.includes('--current') && args.includes('--file')) {
+        const format = args.includes('--yaml') ? 'yaml' : 'json';
+        const outputPath = getArgValue(args, '--output');
+        result = await exportCurrentFileCommand({ format, outputPath });
+      } else if (args.includes('--file')) {
+        const format = args.includes('--yaml') ? 'yaml' : 'json';
+        const outputPath = getArgValue(args, '--output');
+        const profileName = args[1];
+        result = await exportFileCommand({ profileName, format, outputPath });
+      } else if (args.includes('--current')) {
         result = await exportCurrentCommand();
       } else {
         result = await exportCommand({ profileName: args[1] });
+      }
+      break;
+
+    case 'import':
+      if (args[1]) {
+        const format = args.includes('--yaml') ? 'yaml' : 'json';
+        const profileName = getArgValue(args, '--name');
+        result = await importFileCommand({ inputPath: args[1], format, profileName });
+      } else {
+        result = await importFileCommandInteractive();
+      }
+      break;
+
+    case 'backup':
+      if (args.includes('--restore')) {
+        const backupPath = args[args.indexOf('--restore') + 1];
+        result = await restoreCommand({ backupPath });
+      } else if (args.includes('--restore') && args.length === 2) {
+        result = await restoreCommandInteractive();
+      } else {
+        const outputPath = args[1];
+        result = await backupCommand({ outputPath });
+      }
+      break;
+
+    case 'restore':
+      if (args[1]) {
+        result = await restoreCommand({ backupPath: args[1] });
+      } else {
+        result = await restoreCommandInteractive();
       }
       break;
 
@@ -70,7 +133,12 @@ claude-profile - Claude Code 配置文件管理器
   list         列出所有配置
   edit         编辑配置
   delete       删除配置
-  export       导出配置
+  rename       重命名配置: rename <旧名称> <新名称>
+  duplicate    复制配置: duplicate <源名称> <新名称>
+  export       导出配置 (export [--current] [--file [--yaml] [--output <路径>]])
+  import       导入配置: import <文件路径> [--yaml] [--name <配置名>]
+  backup       备份配置: backup [--restore [备份路径]]
+  restore      恢复配置: restore [备份路径]
   init         输出 shell hook 脚本
 
 选项:
@@ -96,6 +164,14 @@ claude-profile - Claude Code 配置文件管理器
       process.exit(130);
     }
   }
+}
+
+function getArgValue(args: string[], arg: string): string | undefined {
+  const index = args.indexOf(arg);
+  if (index >= 0 && index < args.length - 1) {
+    return args[index + 1];
+  }
+  return undefined;
 }
 
 main().catch((error) => {

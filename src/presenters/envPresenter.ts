@@ -9,6 +9,13 @@ export interface EnvPresenter {
   formatSwitchSuccess(profileName: string, env: EnvConfig): string;
   formatDeleteSuccess(profileName: string, wasActive: boolean): string;
   formatEditSuccess(profileName: string, field?: EditableField): string;
+  formatRenameSuccess(oldName: string, newName: string): string;
+  formatDuplicateSuccess(sourceName: string, newName: string): string;
+  formatImportSuccess(profileName: string, filePath: string): string;
+  formatExportSuccess(profileName: string, filePath: string): string;
+  formatBackupSuccess(backupPath: string): string;
+  formatRestoreSuccess(backupPath: string): string;
+  formatBackupList(backups: { name: string; path: string; date: Date }[]): string;
   formatError(message: string): string;
   formatWarning(message: string): string;
   formatNoProfiles(): string;
@@ -152,6 +159,43 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
       return `${icon.success} 配置 '${profileName}' 已更新`;
     }
     return `${icon.success} 已更新 ${theme.bold(profileName)} 的 ${theme.info(EDITABLE_FIELD_LABELS[field])}`;
+  }
+
+  formatRenameSuccess(oldName: string, newName: string): string {
+    return `${icon.success} 配置 '${oldName}' 已重命名为 '${newName}'`;
+  }
+
+  formatDuplicateSuccess(sourceName: string, newName: string): string {
+    return `${icon.success} 配置 '${sourceName}' 已复制到 '${newName}'`;
+  }
+
+  formatImportSuccess(profileName: string, filePath: string): string {
+    return `${icon.success} 配置 '${profileName}' 已从 '${filePath}' 导入`;
+  }
+
+  formatExportSuccess(profileName: string, filePath: string): string {
+    return `${icon.success} 配置 '${profileName}' 已导出到 '${filePath}'`;
+  }
+
+  formatBackupSuccess(backupPath: string): string {
+    return `${icon.success} 备份已创建: ${theme.info(backupPath)}`;
+  }
+
+  formatRestoreSuccess(backupPath: string): string {
+    return `${icon.success} 配置已从 '${backupPath}' 恢复`;
+  }
+
+  formatBackupList(backups: { name: string; path: string; date: Date }[]): string {
+    const lines: string[] = [];
+    lines.push('');
+    lines.push('  可用的备份:');
+    lines.push('');
+    for (const backup of backups) {
+      const dateStr = backup.date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+      lines.push(`  ${theme.info(backup.name)} - ${theme.dim(dateStr)}`);
+    }
+    lines.push('');
+    return lines.join('\n');
   }
 
   formatError(message: string): string {
