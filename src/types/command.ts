@@ -38,6 +38,7 @@ export interface SwitchProfileInput {
 
 export interface DeleteProfileInput {
   profileName: string;
+  yes?: boolean;
 }
 
 export interface RenameProfileInput {

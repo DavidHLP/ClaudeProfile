@@ -10,7 +10,13 @@ export async function deleteCommand(input: DeleteProfileInput): Promise<CommandR
 
     profileService.deleteProfile(input.profileName);
 
-    return { success: true, output: envPresenter.formatDeleteSuccess(input.profileName, isActive) };
+    // If yes flag is true, skip the active warning
+    const showActiveWarning = isActive && !input.yes;
+
+    return {
+      success: true,
+      output: envPresenter.formatDeleteSuccess(input.profileName, showActiveWarning),
+    };
   });
 }
 
