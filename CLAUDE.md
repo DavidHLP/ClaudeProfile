@@ -74,7 +74,16 @@ Source layout: `src/{commands,config,engine,presenters,services,templates,types,
 ## Runtime Notes
 
 - `claude-profile` is installed globally (`npm link` or `npm i -g`). It can be invoked from any directory, not just the repo root.
-- **npm link workaround** — If `npm link` succeeds but the command isn't found, npm prefix may be redirected (e.g. Zed). Manually symlink: `ln -sf /home/david/project/C-Link/bin/claude-profile.js ~/.local/bin/claude-profile && chmod +x ~/.local/bin/claude-profile`
+- **npm link workaround** — If `npm link` succeeds but the command isn't found, npm prefix may be redirected (e.g. Zed). Manually symlink: `ln -sf $(pwd)/bin/claude-profile.js ~/.local/bin/claude-profile && chmod +x ~/.local/bin/claude-profile`
+- **调试 CLI**: 直接 `node bin/claude-profile.js <command>` 避开全局安装链路;改完 `src/` 必须 `npm run build`,因为 bin 引用 `dist/`
+- **Shell completion 语法检查**: `node bin/claude-profile.js completion bash | bash -n`(无输出即通过)
+
+## Command Implementation Patterns
+
+- **CommandResult 守卫**: 测试与调用方访问 `result.output` 前必须用 `if (result.success)` 类型守卫;访问 `result.error` 前用 `if (!result.success)`。`CommandResult` 是 discriminated union,无守卫会触发 TS 报错
+- **runCommand 包装器**: 所有命令实现包在 `runCommand('动作描述', async () => { ... })` 中,自动处理异常 → CommandResult
+- **短路返回**: 在 runCommand 回调中用 `return { success: false as const, error: '...' }` 来短路(`as const` 必须,否则推断为 boolean 丢失 literal type)
+- **全局选项解析**: bin/claude-profile.js 使用 `args.includes('--verbose')` 等数组判断,不引入 commander 等库
 
 ## Source Layout
 
