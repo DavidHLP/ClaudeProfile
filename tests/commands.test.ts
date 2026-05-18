@@ -439,4 +439,136 @@ describe('Commands', () => {
       expect(mockProfileService.setPreviousProfile).toHaveBeenCalledWith(null);
     });
   });
+
+  describe('renameCommand', () => {
+    it('should rename profile successfully', async () => {
+      mockProfileService.profileExists.mockReturnValue(false);
+
+      const { renameCommand } = await import('../src/commands/rename.js');
+      const result = await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
+
+      expect(result.success).toBe(true);
+      expect(result.output).toContain('renamed-profile');
+      expect(mockProfileService.saveProfile).toHaveBeenCalled();
+      expect(mockProfileService.deleteProfile).toHaveBeenCalledWith('test-profile');
+    });
+
+    it('should update current profile reference if renaming active', async () => {
+      mockProfileService.getCurrentProfile.mockReturnValue('test-profile');
+      mockProfileService.profileExists.mockReturnValue(false);
+
+      const { renameCommand } = await import('../src/commands/rename.js');
+      const result = await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
+
+      expect(result.success).toBe(true);
+      expect(mockProfileService.setCurrentProfile).toHaveBeenCalledWith('renamed-profile');
+    });
+
+    it('should return error when old profile does not exist', async () => {
+      mockProfileService.getProfile.mockImplementationOnce(() => {
+        throw new ProfileNotFoundError('non-existent');
+      });
+
+      const { renameCommand } = await import('../src/commands/rename.js');
+      const result = await renameCommand({ oldName: 'non-existent', newName: 'new-name' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('不存在');
+    });
+
+    it('should return error when new name already exists', async () => {
+      mockProfileService.profileExists.mockReturnValueOnce(true);
+
+      const { renameCommand } = await import('../src/commands/rename.js');
+      const result = await renameCommand({ oldName: 'test-profile', newName: 'existing-name' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('已存在');
+    });
+
+    it('should not mutate original profile', async () => {
+      const original = createMockProfile({ name: 'test-profile' });
+      mockProfileService.getProfile.mockReturnValueOnce(original);
+
+      const { renameCommand } = await import('../src/commands/rename.js');
+      await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
+
+      expect(original.name).toBe('test-profile');
+      expect(original.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+    });
+
+    it('should copy all env fields to renamed profile', async () => {
+      mockProfileService.profileExists.mockReturnValue(false);
+
+      const { renameCommand } = await import('../src/commands/rename.js');
+      const result = await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
+
+      expect(result.success).toBe(true);
+      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
+      expect(savedProfile.env.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
+      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('test-model');
+    });
+  });
+
+  describe('duplicateCommand', () => {
+    it('should duplicate profile successfully', async () => {
+      mockProfileService.profileExists.mockReturnValue(false);
+
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      const result = await duplicateCommand({ sourceName: 'test-profile', newName: 'copy-profile' });
+
+      expect(result.success).toBe(true);
+      expect(result.output).toContain('copy-profile');
+      expect(mockProfileService.saveProfile).toHaveBeenCalled();
+    });
+
+    it('should create copy with identical env', async () => {
+      mockProfileService.profileExists.mockReturnValue(false);
+
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      await duplicateCommand({ sourceName: 'test-profile', newName: 'copy-profile' });
+
+      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
+      expect(savedProfile.env.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
+      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('test-model');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('test-sonnet');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('test-opus');
+      expect(savedProfile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('test-haiku');
+    });
+
+    it('should return error when source does not exist', async () => {
+      mockProfileService.getProfile.mockImplementationOnce(() => {
+        throw new ProfileNotFoundError('non-existent');
+      });
+
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      const result = await duplicateCommand({ sourceName: 'non-existent', newName: 'new-name' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('不存在');
+    });
+
+    it('should return error when new name already exists', async () => {
+      mockProfileService.profileExists.mockReturnValueOnce(true);
+
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      const result = await duplicateCommand({ sourceName: 'test-profile', newName: 'existing-name' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('已存在');
+    });
+
+    it('should not mutate original profile', async () => {
+      const original = createMockProfile({ name: 'test-profile' });
+      mockProfileService.getProfile.mockReturnValueOnce(original);
+
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      await duplicateCommand({ sourceName: 'test-profile', newName: 'copy-profile' });
+
+      expect(original.name).toBe('test-profile');
+      expect(original.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+    });
+  });
 });

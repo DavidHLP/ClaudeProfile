@@ -40,6 +40,36 @@ export interface DeleteProfileInput {
   profileName: string;
 }
 
+export interface RenameProfileInput {
+  oldName: string;
+  newName: string;
+}
+
+export interface DuplicateProfileInput {
+  sourceName: string;
+  newName: string;
+}
+
+export interface ExportFileInput {
+  profileName: string;
+  outputPath?: string;
+  format?: 'json' | 'yaml';
+}
+
+export interface ImportProfileInput {
+  inputPath: string;
+  format?: 'json' | 'yaml';
+  profileName?: string;
+}
+
+export interface BackupConfigInput {
+  outputPath?: string;
+}
+
+export interface RestoreConfigInput {
+  backupPath?: string;
+}
+
 export type CommandResult =
   | { success: true; output: string }
   | { success: false; error: string; wasCancelled?: boolean };
