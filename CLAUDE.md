@@ -55,3 +55,36 @@ Source layout: `src/{commands,config,engine,presenters,services,templates,types,
 
 - `claude-profile` is installed globally (`npm link` or `npm i -g`). It can be invoked from any directory, not just the repo root.
 - **npm link workaround** — If `npm link` succeeds but the command isn't found, npm prefix may be redirected (e.g. Zed). Manually symlink: `ln -sf /home/david/project/C-Link/bin/claude-profile.js ~/.local/bin/claude-profile && chmod +x ~/.local/bin/claude-profile`
+
+## Source Layout
+
+```
+src/
+├── commands/     → CLI commands (create, switch, list, edit, delete, export, init)
+├── config/       → ConfigStore interface + FileSystemConfigStore implementation
+├── engine/       → Core logic (settingsSync, activation)
+├── presenters/   → UI output formatting (ANSI tables, env export)
+├── services/     → Business services (ProfileService, SettingsSyncService)
+├── templates/    → Provider templates (MiniMax, Kimi, Aliyun, Volcano)
+├── types/       → TypeScript type definitions
+├── ui/          → Interactive prompts (inquirer wrappers)
+├── errors.ts     → Custom error classes (AppError hierarchy)
+└── index.ts     → Public API exports
+```
+
+## Request Lifecycle
+
+1. `bin/claude-profile.js` parses CLI args, routes to command
+2. Command calls `ProfileService` to read/write config
+3. `ProfileService` uses `ConfigStore` (`FileSystemConfigStore`) to operate on `~/.config/claude-profile/`
+4. `SettingsSyncService` syncs env vars to `~/.claude/settings.json` on switch
+5. `envPresenter` formats output (TTY → table, non-TTY → shell export commands)
+
+## Code Conventions
+
+- **File naming**: camelCase (`fileSystemConfigStore.ts`)
+- **Type naming**: PascalCase (`Profile`, `ConfigStore`)
+- **Error handling**: Custom `AppError` subclasses + `CommandResult` type
+- **Dependency injection**: `ProfileServiceImpl` constructor takes `ConfigStore`
+- **UI output**: Presenter layer uses raw ANSI escape codes (not chalk)
+- **Immutability**: Spread operator for object updates
