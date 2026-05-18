@@ -11,10 +11,18 @@ import { renameCommand, renameCommandInteractive } from '../dist/commands/rename
 import { duplicateCommand, duplicateCommandInteractive } from '../dist/commands/duplicate.js';
 import { backupCommand, restoreCommand, restoreCommandInteractive } from '../dist/commands/backup.js';
 import { initCommand } from '../dist/commands/init.js';
+import { validateCommand } from '../dist/commands/validate.js';
+import { completionCommand } from '../dist/commands/completion.js';
 
 let result;
 const args = process.argv.slice(2);
 const command = args[0] || 'help';
+
+// Global options
+const globalOptions = {
+  verbose: args.includes('--verbose') || args.includes('-v'),
+  yes: args.includes('--yes') || args.includes('-y'),
+};
 
 async function main() {
   switch (command) {
@@ -32,7 +40,7 @@ async function main() {
       break;
 
     case 'list':
-      result = await listCommand();
+      result = await listCommand({ verbose: globalOptions.verbose });
       break;
 
     case 'edit':
@@ -40,8 +48,8 @@ async function main() {
       break;
 
     case 'delete':
-      if (args[1]) {
-        result = await deleteCommand({ profileName: args[1] });
+      if (args[1] && !args[1].startsWith('-')) {
+        result = await deleteCommand({ profileName: args[1], yes: globalOptions.yes });
       } else {
         result = await deleteCommandInteractive();
       }
@@ -118,6 +126,14 @@ async function main() {
       result = await initCommand();
       break;
 
+    case 'validate':
+      result = await validateCommand({ verbose: globalOptions.verbose });
+      break;
+
+    case 'completion':
+      result = await completionCommand({ shell: args[1] });
+      break;
+
     case '--help':
     case '-h':
     case 'help':
@@ -125,7 +141,7 @@ async function main() {
 claude-profile - Claude Code 配置文件管理器
 
 用法:
-  claude-profile <命令> [配置名]
+  claude-profile <命令> [选项] [配置名]
 
 命令:
   create       创建新配置（交互式）
@@ -140,9 +156,19 @@ claude-profile - Claude Code 配置文件管理器
   backup       备份配置: backup [--restore [备份路径]]
   restore      恢复配置: restore [备份路径]
   init         输出 shell hook 脚本
+  validate     验证所有配置完整性
+  completion   生成 shell 自动补全脚本 (bash/zsh/fish)
 
-选项:
+全局选项:
   -h, --help         显示帮助信息
+  -v, --verbose      显示详细输出
+  -y, --yes          跳过确认提示（非交互模式）
+
+示例:
+  claude-profile list --verbose
+  claude-profile delete my-profile --yes
+  claude-profile validate -v
+  claude-profile completion bash > /etc/bash_completion.d/claude-profile
       `);
       break;
 
@@ -166,7 +192,7 @@ claude-profile - Claude Code 配置文件管理器
   }
 }
 
-function getArgValue(args: string[], arg: string): string | undefined {
+function getArgValue(args, arg) {
   const index = args.indexOf(arg);
   if (index >= 0 && index < args.length - 1) {
     return args[index + 1];
