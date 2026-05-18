@@ -38,7 +38,9 @@ Single-context layout: one `CONTEXT.md` + `docs/adr/` at repo root. See `docs/ag
 - Test: `npm run test` (vitest run)
 - Test watch: `npm run test:watch`
 - Type check: `npx tsc --noEmit`
-- **Critical:** Global CLI reads from `dist/`. Always run `npm run build` after modifying `src/` or the installed `claude-profile` will execute stale code.
+- **Test files location**: All tests go in `tests/` directory (vitest config: `include: ['tests/**/*.test.ts']`)
+- **Import syntax**: Use `.js` suffix in test imports even for TypeScript sources (e.g., `from '../src/templates/providerRegistry.js'`)
+- **Test singletons**: When testing singleton instances (e.g., `providerRegistry`), create fresh instances in `beforeEach` to avoid test pollution
 
 ## Architecture
 
@@ -84,6 +86,9 @@ src/
 ├── presenters/   → UI output formatting (ANSI tables, env export)
 ├── services/     → Business services (ProfileService, SettingsSyncService)
 ├── templates/    → Provider templates (MiniMax, Kimi, Aliyun, Volcano)
+│                → Also: envTemplate/ (variable interpolation engine)
+│                → Also: providerRegistry.ts (dynamic provider registration)
+├── plugins/      → Plugin system (types, validator, loader, manager, discovery)
 ├── types/       → TypeScript type definitions
 ├── ui/          → Interactive prompts (inquirer wrappers)
 ├── errors.ts     → Custom error classes (AppError hierarchy)
