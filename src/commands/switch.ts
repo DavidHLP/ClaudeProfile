@@ -38,7 +38,7 @@ export async function switchCommandInteractive(): Promise<CommandResult> {
   // 输出 banner
   console.log(envPresenter.formatBanner());
 
-  // 如果只有一个配置且已是当前配置，仍执行 sync 确保settings.json一致
+  // 如果只有一个配置且已是当前配置，无需操作
   if (profiles.length === 1 && profiles[0].name === currentProfile) {
     return switchCommand({ profileName: currentProfile });
   }
@@ -49,7 +49,7 @@ export async function switchCommandInteractive(): Promise<CommandResult> {
     return { success: false, error: '已取消切换。', wasCancelled: true };
   }
 
-  // 如果选择的就是当前配置，仍执行 sync 确保settings.json一致
+  // 如果选择的就是当前配置，仅切换本地配置，不同步到 settings.json
   if (selectedName === currentProfile) {
     return switchCommand({ profileName: selectedName });
   }
