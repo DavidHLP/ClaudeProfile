@@ -34,6 +34,7 @@ export interface EditProfileInput {
 
 export interface SwitchProfileInput {
   profileName: string;
+  syncToSettings?: boolean;
 }
 
 export interface DeleteProfileInput {

@@ -35,7 +35,8 @@ async function main() {
         result = await switchCommandInteractive();
       } else {
         const profileName = args[1];
-        result = await switchCommand({ profileName: profileName });
+        const syncToSettings = args.includes('--sync');
+        result = await switchCommand({ profileName: profileName, syncToSettings });
       }
       break;
 
@@ -145,7 +146,7 @@ claude-profile - Claude Code 配置文件管理器
 
 命令:
   create       创建新配置（交互式）
-  switch       切换配置（无参数时进入交互模式）
+  switch       切换配置（无参数时进入交互模式）[--sync 同步到 settings.json]
   list         列出所有配置
   edit         编辑配置
   delete       删除配置

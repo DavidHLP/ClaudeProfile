@@ -140,9 +140,16 @@ describe('Commands', () => {
       expect(result.output).toContain('unset API_TIMEOUT_MS');
     });
 
-    it('should call syncOnSwitch with old and new env', async () => {
+    it('should not call syncOnSwitch by default', async () => {
       const { switchCommand } = await import('../src/commands/switch.js');
       await switchCommand({ profileName: 'test-profile' }, true);
+
+      expect(mockSettingsSyncService.syncOnSwitch).not.toHaveBeenCalled();
+    });
+
+    it('should call syncOnSwitch when syncToSettings is true', async () => {
+      const { switchCommand } = await import('../src/commands/switch.js');
+      await switchCommand({ profileName: 'test-profile', syncToSettings: true }, true);
 
       expect(mockSettingsSyncService.syncOnSwitch).toHaveBeenCalled();
       const [oldEnv, newEnv] = mockSettingsSyncService.syncOnSwitch.mock.calls[0];

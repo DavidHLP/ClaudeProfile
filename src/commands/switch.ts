@@ -12,7 +12,10 @@ export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = 
 
     const profile = profileService.getProfile(input.profileName);
     profileService.setCurrentProfile(input.profileName);
-    settingsSyncService.syncOnSwitch(oldEnv, profile.env);
+
+    if (input.syncToSettings) {
+      settingsSyncService.syncOnSwitch(oldEnv, profile.env);
+    }
 
     if (isTTY) {
       return { success: true, output: envPresenter.formatSwitchSuccess(input.profileName, profile.env) };
