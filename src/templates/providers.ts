@@ -54,6 +54,19 @@ export const providerTemplates: ProviderTemplate[] = [
     },
   },
   {
+    id: 'xunfei',
+    name: '讯飞星辰',
+    description: '讯飞星辰 Coding Plan API',
+    defaultBaseUrl: 'https://maas-coding-api.cn-huabei-1.xf-yun.com/anthropic',
+    defaultModel: 'astron-code-latest',
+    envTemplate: {
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'astron-code-latest',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'astron-code-latest',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'astron-code-latest',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'astron-code-latest',
+    },
+  },
+  {
     id: 'custom',
     name: '自定义',
     description: '手动配置所有参数',
