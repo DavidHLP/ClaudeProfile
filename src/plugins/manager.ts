@@ -1,4 +1,4 @@
-import type { PluginManifest, Plugin, HookName, ProfileSwitchContext } from './types.js';
+import type { PluginManifest, Plugin, HookName } from './types.js';
 import { PluginLoader } from './loader.js';
 
 /**
@@ -7,9 +7,11 @@ import { PluginLoader } from './loader.js';
 export class PluginManager {
   private plugins: Map<string, Plugin> = new Map();
   private loader: PluginLoader;
+  private onError?: (pluginId: string, hookName: HookName, error: unknown) => void;
 
-  constructor() {
+  constructor(onError?: (pluginId: string, hookName: HookName, error: unknown) => void) {
     this.loader = new PluginLoader();
+    this.onError = onError;
   }
 
   async registerPlugin(manifest: PluginManifest): Promise<void> {
@@ -90,8 +92,11 @@ export class PluginManager {
         try {
           await hook(context as never);
         } catch (error) {
-          // Log error but continue with other hooks
-          console.error(`Error in plugin "${plugin.manifest.id}" hook "${hookName}":`, error);
+          if (this.onError) {
+            this.onError(plugin.manifest.id, hookName, error);
+          } else {
+            console.error(`Error in plugin "${plugin.manifest.id}" hook "${hookName}":`, error);
+          }
         }
       }
     }
