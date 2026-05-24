@@ -1,9 +1,12 @@
 import { profileService } from '../services/profileService.js';
-import { settingsSyncService } from '../services/settingsSyncService.js';
+import { settingsSyncService, createSettingsSyncService } from '../services/settingsSyncService.js';
 import { envPresenter, buildSwitchCommands } from '../presenters/envPresenter.js';
 import { SwitchProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { resolveOldEnv } from '../engine/activation.js';
+import { isValidSettingsScope } from '../config/claudeSettingsStore.js';
+import type { SettingsScope } from '../config/claudeSettingsStore.js';
+import { AppError } from '../errors.js';
 
 export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = process.stdout.isTTY): Promise<CommandResult> {
   return runCommand('切换配置', async () => {
@@ -11,17 +14,42 @@ export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = 
     const oldEnv = resolveOldEnv(profileService, currentProfileName, input.profileName);
 
     const profile = profileService.getProfile(input.profileName);
+
+    if (input.dryRun) {
+      const scope = input.scope || 'user';
+      return {
+        success: true,
+        output: `【dry-run】将切换配置 '${input.profileName}'\nscope: ${scope}\n环境变量: ${Object.keys(profile.env).join(', ')}`,
+      };
+    }
+
     profileService.setCurrentProfile(input.profileName);
 
-    if (input.syncToSettings) {
-      settingsSyncService.syncOnSwitch(oldEnv, profile.env);
+    const syncToSettings = input.syncToSettings ?? true;
+    let syncWarning: string | undefined;
+    if (syncToSettings) {
+      let scope: SettingsScope | undefined;
+      if (input.scope) {
+        if (!isValidSettingsScope(input.scope)) {
+          throw new AppError(`无效的 scope: "${input.scope}". 有效值为: user, project, local`, 'INVALID_SCOPE');
+        }
+        scope = input.scope;
+      }
+      const syncService = scope ? createSettingsSyncService(scope) : settingsSyncService;
+      const syncResult = syncService.syncOnSwitch(oldEnv, profile.env);
+      if (!syncResult.success && syncResult.warning) {
+        syncWarning = syncResult.warning;
+      }
     }
 
-    if (isTTY) {
-      return { success: true, output: envPresenter.formatSwitchSuccess(input.profileName, profile.env) };
-    } else {
-      return { success: true, output: buildSwitchCommands(oldEnv, profile.env) };
+    const output = isTTY
+      ? envPresenter.formatSwitchSuccess(input.profileName, profile.env)
+      : buildSwitchCommands(oldEnv, profile.env);
+
+    if (syncWarning) {
+      return { success: true, output: `${output}\n\n${envPresenter.formatWarning(syncWarning)}` };
     }
+    return { success: true, output };
   });
 }
 

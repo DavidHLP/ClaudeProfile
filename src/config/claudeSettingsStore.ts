@@ -1,7 +1,25 @@
 import { homedir } from 'os';
-import { join } from 'path';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { FileOperationError, SettingsFileCorruptError } from '../errors.js';
+
+export type SettingsScope = 'user' | 'project' | 'local';
+
+export function isValidSettingsScope(scope: string): scope is SettingsScope {
+  return scope === 'user' || scope === 'project' || scope === 'local';
+}
+
+export function resolveSettingsPath(scope: SettingsScope, cwd?: string): string {
+  const baseDir = cwd || process.cwd();
+  switch (scope) {
+    case 'user':
+      return join(homedir(), '.claude', 'settings.json');
+    case 'project':
+      return join(baseDir, '.claude', 'settings.json');
+    case 'local':
+      return join(baseDir, '.claude', 'settings.local.json');
+  }
+}
 
 export interface ClaudeSettingsStore {
   readEnv(): Record<string, string>;
@@ -11,8 +29,14 @@ export interface ClaudeSettingsStore {
 export class ClaudeSettingsStoreImpl implements ClaudeSettingsStore {
   private readonly filePath: string;
 
-  constructor(filePath?: string) {
-    this.filePath = filePath ?? join(homedir(), '.claude', 'settings.json');
+  constructor(scopeOrPath?: SettingsScope | string, cwd?: string) {
+    if (!scopeOrPath) {
+      this.filePath = join(homedir(), '.claude', 'settings.json');
+    } else if (scopeOrPath === 'user' || scopeOrPath === 'project' || scopeOrPath === 'local') {
+      this.filePath = resolveSettingsPath(scopeOrPath, cwd);
+    } else {
+      this.filePath = scopeOrPath;
+    }
   }
 
   readEnv(): Record<string, string> {
@@ -52,7 +76,11 @@ export class ClaudeSettingsStoreImpl implements ClaudeSettingsStore {
     }
     const updated = { ...settings, env };
     try {
-      writeFileSync(this.filePath, JSON.stringify(updated, null, 2) + '\n', 'utf-8');
+      const dir = dirname(this.filePath);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true, mode: 0o700 });
+      }
+      writeFileSync(this.filePath, JSON.stringify(updated, null, 2) + '\n', { encoding: 'utf-8', mode: 0o600 });
     } catch (err) {
       throw new FileOperationError('write', this.filePath, err);
     }

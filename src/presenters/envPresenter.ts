@@ -1,6 +1,7 @@
 import { EnvConfig, Profile } from '../types/index.js';
 import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
 import { theme, icon, padVisualEnd, box } from '../ui/theme.js';
+import { validateEnvKeyOrThrow, shellQuote } from '../utils/shellSafety.js';
 
 export interface EnvPresenter {
   formatBanner(): string;
@@ -22,11 +23,60 @@ export interface EnvPresenter {
   formatCancel(message: string): string;
 }
 
+export interface EnvJsonOutput {
+  set: Record<string, string>;
+  unset: string[];
+}
+
+export function buildExportJson(env: EnvConfig): EnvJsonOutput {
+  const set: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value) {
+      validateEnvKeyOrThrow(key);
+      set[key] = value;
+    }
+  }
+  return { set, unset: [] };
+}
+
+export function buildSwitchJson(oldEnv: EnvConfig | null, newEnv: EnvConfig): EnvJsonOutput {
+  const set: Record<string, string> = {};
+  const unset: string[] = [];
+
+  const oldKeys = new Set<string>();
+  if (oldEnv) {
+    for (const [key, value] of Object.entries(oldEnv)) {
+      if (value) {
+        oldKeys.add(key);
+      }
+    }
+  }
+
+  const newKeys = new Set<string>();
+  for (const [key, value] of Object.entries(newEnv)) {
+    if (value) {
+      newKeys.add(key);
+      validateEnvKeyOrThrow(key);
+      set[key] = value;
+    }
+  }
+
+  for (const key of oldKeys) {
+    if (!newKeys.has(key)) {
+      validateEnvKeyOrThrow(key);
+      unset.push(key);
+    }
+  }
+
+  return { set, unset };
+}
+
 export function buildExportCommands(env: EnvConfig): string {
   const lines: string[] = [];
   for (const [key, value] of Object.entries(env)) {
     if (value) {
-      lines.push(`export ${key}='${value}';`);
+      validateEnvKeyOrThrow(key);
+      lines.push(`export ${key}=${shellQuote(value)};`);
     }
   }
   return lines.join('\n');
@@ -53,13 +103,15 @@ export function buildSwitchCommands(oldEnv: EnvConfig | null, newEnv: EnvConfig)
 
   for (const key of oldKeys) {
     if (!newKeys.has(key)) {
+      validateEnvKeyOrThrow(key);
       lines.push(`unset ${key};`);
     }
   }
 
   for (const [key, value] of Object.entries(newEnv)) {
     if (value) {
-      lines.push(`export ${key}='${value}';`);
+      validateEnvKeyOrThrow(key);
+      lines.push(`export ${key}=${shellQuote(value)};`);
     }
   }
 

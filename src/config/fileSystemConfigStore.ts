@@ -4,6 +4,9 @@ import { join } from 'path';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { ConfigStore } from './configStore.js';
 
+const CONFIG_DIR_MODE = 0o700;
+const CONFIG_FILE_MODE = 0o600;
+
 export class FileSystemConfigStore implements ConfigStore {
   private readonly configDir: string;
   private readonly currentFile: string;
@@ -18,7 +21,7 @@ export class FileSystemConfigStore implements ConfigStore {
 
   private ensureConfigDir(): void {
     if (!existsSync(this.configDir)) {
-      mkdirSync(this.configDir, { recursive: true });
+      mkdirSync(this.configDir, { recursive: true, mode: CONFIG_DIR_MODE });
     }
   }
 
@@ -53,7 +56,7 @@ export class FileSystemConfigStore implements ConfigStore {
 
   saveProfile(profile: Profile): void {
     const filePath = join(this.configDir, `${profile.name}.json`);
-    writeFileSync(filePath, JSON.stringify(profile, null, 2), 'utf-8');
+    writeFileSync(filePath, JSON.stringify(profile, null, 2), { encoding: 'utf-8', mode: CONFIG_FILE_MODE });
   }
 
   deleteProfile(name: string): boolean {
@@ -73,7 +76,7 @@ export class FileSystemConfigStore implements ConfigStore {
   }
 
   setCurrentProfile(name: string): void {
-    writeFileSync(this.currentFile, name, 'utf-8');
+    writeFileSync(this.currentFile, name, { encoding: 'utf-8', mode: CONFIG_FILE_MODE });
   }
 
   getPreviousProfile(): string | null {
@@ -90,7 +93,7 @@ export class FileSystemConfigStore implements ConfigStore {
         unlinkSync(this.prevFile);
       }
     } else {
-      writeFileSync(this.prevFile, name, 'utf-8');
+      writeFileSync(this.prevFile, name, { encoding: 'utf-8', mode: CONFIG_FILE_MODE });
     }
   }
 

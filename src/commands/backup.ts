@@ -1,5 +1,6 @@
-import { execSync } from 'child_process';
-import { mkdirSync, existsSync, readdirSync } from 'fs';
+import * as tar from 'tar';
+import type { Stats } from 'fs';
+import { mkdirSync, existsSync, readdirSync, statSync } from 'fs';
 import { dirname } from 'path';
 import { profileService } from '../services/profileService.js';
 import { envPresenter } from '../presenters/envPresenter.js';
@@ -27,14 +28,57 @@ function generateBackupName(): string {
   return `claude-profile-backup-${timestamp}.tar.gz`;
 }
 
-function createTarGz(sourceDir: string, targetPath: string): void {
-  // Use tar command to create gzip compressed archive
-  execSync(`tar -czf "${targetPath}" -C "${sourceDir}" .`, { stdio: 'pipe' });
+interface TarEntry {
+  path?: string;
+  type?: string;
 }
 
-function extractTarGz(sourcePath: string, targetDir: string): void {
-  // Use tar command to extract gzip compressed archive
-  execSync(`tar -xzf "${sourcePath}" -C "${targetDir}"`, { stdio: 'pipe' });
+function validateTarEntry(entry: TarEntry): boolean {
+  if (!entry.path) {
+    return false;
+  }
+
+  const path = entry.path;
+
+  // Reject absolute paths
+  if (path.startsWith('/')) {
+    return false;
+  }
+
+  // Reject path traversal
+  const parts = path.split('/');
+  if (parts.includes('..')) {
+    return false;
+  }
+
+  // Reject symlinks and hardlinks
+  if (entry.type === 'SymbolicLink' || entry.type === 'Link') {
+    return false;
+  }
+
+  return true;
+}
+
+async function createTarGz(sourceDir: string, targetPath: string): Promise<void> {
+  await tar.create(
+    {
+      gzip: true,
+      file: targetPath,
+      cwd: sourceDir,
+    },
+    ['.']
+  );
+}
+
+async function extractTarGz(sourcePath: string, targetDir: string): Promise<void> {
+  await tar.extract({
+    file: sourcePath,
+    cwd: targetDir,
+    filter: (entryPath: string, entry: tar.ReadEntry | Stats) => {
+      const type = 'type' in entry ? entry.type : undefined;
+      return validateTarEntry({ path: entryPath, type });
+    },
+  });
 }
 
 export async function backupCommand(input: BackupConfigInput): Promise<CommandResult> {
@@ -58,7 +102,7 @@ export async function backupCommand(input: BackupConfigInput): Promise<CommandRe
 
     try {
       // Create tar.gz archive of the config directory
-      createTarGz(storeLocation, backupPath);
+      await createTarGz(storeLocation, backupPath);
     } catch (err) {
       throw new FileOperationError('create backup', backupPath, err);
     }
@@ -79,7 +123,7 @@ function listBackups(): { name: string; path: string; date: Date }[] {
       .filter(f => f.endsWith('.tar.gz'))
       .map(f => {
         const path = `${backupDir}/${f}`;
-        const stats = existsSync(path) ? { mtime: new Date() } : null;
+        const stats = existsSync(path) ? { mtime: statSync(path).mtime } : null;
         return {
           name: f,
           path,
@@ -108,7 +152,7 @@ export async function restoreCommand(input: RestoreConfigInput): Promise<Command
       }
 
       try {
-        extractTarGz(input.backupPath, storeLocation);
+        await extractTarGz(input.backupPath, storeLocation);
       } catch (err) {
         throw new FileOperationError('restore from backup', input.backupPath, err);
       }
