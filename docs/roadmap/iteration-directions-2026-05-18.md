@@ -3,13 +3,15 @@
 **日期**: 2026-05-18
 **分析者**: Claude Code
 
+> ⚠️ **STALE DOCUMENT** (2026-05-24): 以下"已知局限"中标注 ✅ 的项目已在后续迭代中实现。此文档保留用于历史参考，请勿作为当前状态依据。
+
 ---
 
 ## 项目现状概述
 
 ### 核心功能
 CLI 工具管理多个 AI API 配置（Profile），支持：
-- 内置 Provider 模板：MiniMax、Kimi、阿里云百炼、火山引擎
+- 内置 Provider 模板：MiniMax、Kimi、阿里云百炼、火山引擎、讯飞星辰
 - 通过 `eval bridge` 模式向父 shell 注入环境变量
 - 自动同步到 Claude Code 的 `settings.json`
 
@@ -19,10 +21,10 @@ bin/claude-profile.js → commands/* → ProfileService → ConfigStore → ~/.c
 ```
 
 ### 已知局限
-1. 无 API token 验证（只检查非空）
-2. 无 profile 重命名命令
-3. 无导入/导出功能
-4. 无备份/恢复功能
+1. ✅ API token 验证（`validate` 命令 + `utils/validation.ts`）
+2. ✅ profile 重命名命令（`rename`）
+3. ✅ 导入/导出功能（`import` / `export`，支持 JSON/YAML）
+4. ✅ 备份/恢复功能（`backup` / `restore`）
 5. 交互命令缺少测试覆盖
 6. 设置同步失败时静默警告
 
@@ -42,35 +44,35 @@ bin/claude-profile.js → commands/* → ProfileService → ConfigStore → ~/.c
 **风险**: 低
 
 ### B. 功能补全
-| 命令 | 说明 |
-|------|------|
-| `rename` | 重命名 profile |
-| `import/export` | 导入导出 profile 配置（支持 JSON/YAML） |
-| `duplicate` | 复制现有 profile |
-| `backup/restore` | 备份整个配置目录 |
+| 命令 | 说明 | 状态 |
+|------|------|------|
+| `rename` | 重命名 profile | ✅ 已实现 |
+| `import/export` | 导入导出 profile 配置（支持 JSON/YAML） | ✅ 已实现 |
+| `duplicate` | 复制现有 profile | ✅ 已实现 |
+| `backup/restore` | 备份整个配置目录 | ✅ 已实现 |
 
 **价值**: 最常被请求的功能
 **复杂度**: 中
 **风险**: 中
 
 ### C. 扩展性
-| 项目 | 说明 |
-|------|------|
-| 自定义 Provider 模板 | 用户可创建和分享自己的 provider |
-| 插件系统 | 支持第三方扩展 |
-| 环境变量模板 | 支持变量引用和继承 |
+| 项目 | 说明 | 状态 |
+|------|------|------|
+| 自定义 Provider 模板 | 用户可创建和分享自己的 provider | ✅ `providerRegistry.ts` 支持动态注册 |
+| 插件系统 | 支持第三方扩展 | ✅ `plugins/` 目录已实现完整生命周期 |
+| 环境变量模板 | 支持变量引用和继承 | ✅ `templates/envTemplate/` 已实现 |
 
 **价值**: 面向未来，生态建设
 **复杂度**: 高
 **风险**: 高
 
 ### D. UX 提升
-| 项目 | 说明 |
-|------|------|
-| Shell 补全 | bash/zsh/fish 自动补全脚本 |
-| 非交互模式 | 支持 `--yes`/`-y` 跳过确认 |
-| 详细输出 | 添加 `--verbose` 选项 |
-| 配置验证命令 | `claude-profile validate` 检查配置完整性 |
+| 项目 | 说明 | 状态 |
+|------|------|------|
+| Shell 补全 | bash/zsh/fish 自动补全脚本 | ✅ `completion` 命令已实现 |
+| 非交互模式 | 支持 `--yes`/`-y` 跳过确认 | ✅ 全局 `--yes` / `-y` 选项已支持 |
+| 详细输出 | 添加 `--verbose` 选项 | ✅ 全局 `--verbose` / `-v` 选项已支持 |
+| 配置验证命令 | `claude-profile validate` 检查配置完整性 | ✅ `validate` 命令已实现 |
 
 **价值**: 提升效率，符合 CLI 最佳实践
 **复杂度**: 低-中

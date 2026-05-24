@@ -1,6 +1,6 @@
 # Dependencies & Integrations
 
-<!-- Generated: 2026-05-18 | Files scanned: 26 | Token estimate: ~300 -->
+<!-- Generated: 2026-05-24 | Files scanned: 44 | Token estimate: ~400 -->
 
 ## External Services
 
@@ -14,6 +14,9 @@
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `inquirer` | ^9.2.0 | Interactive CLI prompts |
+| `yaml` | ^2.9.0 | YAML parsing for import/export |
+| `tar` | ^7.5.15 | Backup archive creation |
+| `tar-fs` | ^3.1.2 | Backup archive extraction |
 
 ## Dev Dependencies
 
@@ -21,8 +24,10 @@
 |---------|---------|
 | `typescript` | Type checking and compilation |
 | `vitest` | Unit testing framework |
+| `@vitest/coverage-v8` | Test coverage reporting |
 | `@types/inquirer` | TypeScript types for inquirer |
 | `@types/node` | Node.js type definitions |
+| `@types/tar-fs` | TypeScript types for tar-fs |
 
 ## Managed Settings Keys
 
@@ -46,4 +51,5 @@ CLAUDE_CODE_SUBAGENT_MODEL
 | `kimi` | Kimi (Moonshot) | `https://api.kimi.com/coding/` |
 | `aliyun` | 阿里云百炼 | `https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic` |
 | `volcano` | 火山引擎 | `https://ark.cn-beijing.volces.com/api/coding` |
+| `xunfei` | 讯飞星辰 | `https://maas-coding-api.cn-huabei-1.xf-yun.com/anthropic` |
 | `custom` | 自定义 | (empty) |

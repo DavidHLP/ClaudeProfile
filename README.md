@@ -5,7 +5,7 @@ Claude Code 配置文件管理器 - 交互式管理多 API 配置
 ## 功能
 
 - 交互式创建、编辑、删除 API 配置
-- 支持多个 Provider: MiniMax、Kimi (Moonshot)、阿里云百炼、火山引擎等
+- 支持多个 Provider: MiniMax、Kimi (Moonshot)、阿里云百炼、火山引擎、讯飞星辰等
 - 密码式 Token 输入，安全可靠
 - 无缝切换环境变量，一条命令完成配置
 - **自动同步到 Claude Code settings.json**（支持 VSCode 和 Zed 扩展）
@@ -112,6 +112,64 @@ claude-profile export minimax
 
 # 导出当前配置
 claude-profile export --current
+
+# 导出到文件（JSON/YAML）
+claude-profile export minimax --file --yaml --output ./minimax.yaml
+```
+
+### 导入配置
+
+```bash
+# 从文件导入
+claude-profile import ./profile.json
+
+# 指定名称导入 YAML
+claude-profile import ./profile.yaml --name my-profile
+```
+
+### 重命名配置
+
+```bash
+claude-profile rename old-name new-name
+```
+
+### 复制配置
+
+```bash
+claude-profile duplicate source-name new-name
+```
+
+### 备份与恢复
+
+```bash
+# 备份所有配置
+claude-profile backup ./backup.tar.gz
+
+# 恢复配置
+claude-profile restore ./backup.tar.gz
+```
+
+### 验证配置
+
+```bash
+# 验证所有配置完整性
+claude-profile validate
+
+# 显示详细信息
+claude-profile validate --verbose
+```
+
+### Shell 自动补全
+
+```bash
+# Bash
+claude-profile completion bash > /etc/bash_completion.d/claude-profile
+
+# Zsh
+claude-profile completion zsh > /usr/local/share/zsh/site-functions/_claude-profile
+
+# Fish
+claude-profile completion fish > ~/.config/fish/completions/claude-profile.fish
 ```
 
 ## Claude Code 集成
