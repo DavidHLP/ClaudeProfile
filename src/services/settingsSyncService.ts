@@ -1,5 +1,5 @@
 import type { EnvConfig } from '../types/index.js';
-import type { ClaudeSettingsStore } from '../config/claudeSettingsStore.js';
+import type { ClaudeSettingsStore, SettingsScope } from '../config/claudeSettingsStore.js';
 import { computeSettingsEnv } from '../engine/settingsSync.js';
 import { ClaudeSettingsStoreImpl } from '../config/claudeSettingsStore.js';
 
@@ -7,6 +7,7 @@ export type SyncErrorStrategy = 'strict' | 'warn' | 'silent';
 
 export interface SyncOptions {
   errorStrategy?: SyncErrorStrategy;
+  scope?: SettingsScope;
 }
 
 export interface SyncResult {
@@ -31,19 +32,22 @@ export class SettingsSyncServiceImpl implements SettingsSyncService {
       return { success: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const warning = `Failed to sync to ~/.claude/settings.json: ${message}`;
+      const warning = `同步 settings.json 失败: ${message}`;
 
       switch (errorStrategy) {
         case 'strict':
           throw new Error(message);
         case 'warn':
-          process.stderr.write(`Warning: ${warning}\n`);
           return { success: false, warning };
         case 'silent':
           return { success: false };
       }
     }
   }
+}
+
+export function createSettingsSyncService(scope?: SettingsScope): SettingsSyncService {
+  return new SettingsSyncServiceImpl(new ClaudeSettingsStoreImpl(scope));
 }
 
 export const settingsSyncService: SettingsSyncService = new SettingsSyncServiceImpl(new ClaudeSettingsStoreImpl());

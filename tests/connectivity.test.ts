@@ -150,7 +150,7 @@ describe('SettingsSyncService Error Handling', () => {
 
     expect(result).toEqual({
       success: false,
-      warning: 'Failed to sync to ~/.claude/settings.json: Permission denied',
+      warning: '同步 settings.json 失败: Permission denied',
     });
   });
 
@@ -170,15 +170,10 @@ describe('SettingsSyncService Error Handling', () => {
       ANTHROPIC_AUTH_TOKEN: 'test-token',
     };
 
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const result = service.syncOnSwitch(null, env);
 
-    service.syncOnSwitch(null, env);
-
-    expect(stderrSpy).toHaveBeenCalledWith(
-      'Warning: Failed to sync to ~/.claude/settings.json: Permission denied\n'
-    );
-
-    stderrSpy.mockRestore();
+    expect(result.success).toBe(false);
+    expect(result.warning).toContain('Permission denied');
   });
 
   it('returns success when sync succeeds', () => {

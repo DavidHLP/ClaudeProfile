@@ -13,6 +13,10 @@ import { backupCommand, restoreCommand, restoreCommandInteractive } from '../dis
 import { initCommand } from '../dist/commands/init.js';
 import { validateCommand } from '../dist/commands/validate.js';
 import { completionCommand } from '../dist/commands/completion.js';
+import { runProfileCommand, execProfileCommand } from '../dist/commands/run.js';
+import { syncCommand } from '../dist/commands/sync.js';
+import { doctorCommand } from '../dist/commands/doctor.js';
+import { statusCommand } from '../dist/commands/status.js';
 
 let result;
 const args = process.argv.slice(2);
@@ -22,6 +26,8 @@ const command = args[0] || 'help';
 const globalOptions = {
   verbose: args.includes('--verbose') || args.includes('-v'),
   yes: args.includes('--yes') || args.includes('-y'),
+  json: args.includes('--json'),
+  plain: args.includes('--plain'),
 };
 
 async function main() {
@@ -35,8 +41,10 @@ async function main() {
         result = await switchCommandInteractive();
       } else {
         const profileName = args[1];
-        const syncToSettings = args.includes('--sync');
-        result = await switchCommand({ profileName: profileName, syncToSettings });
+        const syncToSettings = !args.includes('--no-sync');
+        const scope = getArgValue(args, '--scope');
+        const dryRun = args.includes('--dry-run');
+        result = await switchCommand({ profileName, syncToSettings, scope, dryRun });
       }
       break;
 
@@ -87,9 +95,9 @@ async function main() {
         const profileName = args[1];
         result = await exportFileCommand({ profileName, format, outputPath });
       } else if (args.includes('--current')) {
-        result = await exportCurrentCommand();
+        result = await exportCurrentCommand({ json: globalOptions.json });
       } else {
-        result = await exportCommand({ profileName: args[1] });
+        result = await exportCommand({ profileName: args[1], json: globalOptions.json });
       }
       break;
 
@@ -97,7 +105,8 @@ async function main() {
       if (args[1]) {
         const format = args.includes('--yaml') ? 'yaml' : 'json';
         const profileName = getArgValue(args, '--name');
-        result = await importFileCommand({ inputPath: args[1], format, profileName });
+        const force = args.includes('--force');
+        result = await importFileCommand({ inputPath: args[1], format, profileName, force });
       } else {
         result = await importFileCommandInteractive();
       }
@@ -105,10 +114,13 @@ async function main() {
 
     case 'backup':
       if (args.includes('--restore')) {
-        const backupPath = args[args.indexOf('--restore') + 1];
-        result = await restoreCommand({ backupPath });
-      } else if (args.includes('--restore') && args.length === 2) {
-        result = await restoreCommandInteractive();
+        const restoreIndex = args.indexOf('--restore');
+        const backupPath = args[restoreIndex + 1];
+        if (backupPath && !backupPath.startsWith('-')) {
+          result = await restoreCommand({ backupPath });
+        } else {
+          result = await restoreCommandInteractive();
+        }
       } else {
         const outputPath = args[1];
         result = await backupCommand({ outputPath });
@@ -135,6 +147,43 @@ async function main() {
       result = await completionCommand({ shell: args[1] });
       break;
 
+    case 'run':
+    case 'exec': {
+      const profileName = args[1];
+      const dashIndex = args.indexOf('--');
+      const cmdArgs = dashIndex >= 0 ? args.slice(dashIndex + 1) : [];
+      const preDashArgs = dashIndex >= 0 ? args.slice(0, dashIndex) : args;
+      const noInheritEnv = preDashArgs.includes('--no-inherit-env');
+      const printEnv = preDashArgs.includes('--print-env');
+      if (!profileName) {
+        result = { success: false, error: '用法: claude-profile run <配置名> -- <命令...>' };
+      } else {
+        const cmd = command === 'run' ? runProfileCommand : execProfileCommand;
+        result = await cmd({ profileName, command: cmdArgs, noInheritEnv, printEnv });
+      }
+      break;
+    }
+
+    case 'sync': {
+      const profileName = args[1];
+      const scope = getArgValue(args, '--scope');
+      const dryRun = args.includes('--dry-run');
+      if (!profileName) {
+        result = { success: false, error: '用法: claude-profile sync <配置名> [--scope user|project|local] [--dry-run]' };
+      } else {
+        result = await syncCommand({ profileName, scope, dryRun });
+      }
+      break;
+    }
+
+    case 'doctor':
+      result = await doctorCommand();
+      break;
+
+    case 'status':
+      result = await statusCommand();
+      break;
+
     case '--help':
     case '-h':
     case 'help':
@@ -146,16 +195,22 @@ claude-profile - Claude Code 配置文件管理器
 
 命令:
   create       创建新配置（交互式）
-  switch       切换配置（无参数时进入交互模式）[--sync 同步到 settings.json]
+  switch       切换配置（无参数时进入交互模式）
+               [--no-sync 不同步到 settings.json] [--scope user|project|local] [--dry-run]
   list         列出所有配置
   edit         编辑配置
   delete       删除配置
   rename       重命名配置: rename <旧名称> <新名称>
   duplicate    复制配置: duplicate <源名称> <新名称>
-  export       导出配置 (export [--current] [--file [--yaml] [--output <路径>]])
-  import       导入配置: import <文件路径> [--yaml] [--name <配置名>]
+  export       导出配置 (export [--current] [--file [--yaml] [--output <路径>]] [--json])
+  import       导入配置: import <文件路径> [--yaml] [--name <配置名>] [--force]
   backup       备份配置: backup [--restore [备份路径]]
   restore      恢复配置: restore [备份路径]
+  run          以指定配置运行命令: run <配置名> -- <命令...> [--no-inherit-env] [--print-env]
+  exec         run 的别名
+  sync         同步配置到 settings.json: sync <配置名> [--scope user|project|local] [--dry-run]
+  doctor       运行诊断检查
+  status       显示当前状态
   init         输出 shell hook 脚本
   validate     验证所有配置完整性
   completion   生成 shell 自动补全脚本 (bash/zsh/fish)
@@ -164,11 +219,17 @@ claude-profile - Claude Code 配置文件管理器
   -h, --help         显示帮助信息
   -v, --verbose      显示详细输出
   -y, --yes          跳过确认提示（非交互模式）
+      --json         输出 JSON 格式（适合脚本消费）
+      --plain        输出纯文本（无 ANSI 转义序列）
 
 示例:
   claude-profile list --verbose
   claude-profile delete my-profile --yes
   claude-profile validate -v
+  claude-profile switch minimax --scope project
+  claude-profile sync minimax --dry-run
+  claude-profile doctor
+  claude-profile status
   claude-profile completion bash > /etc/bash_completion.d/claude-profile
       `);
       break;
@@ -193,6 +254,11 @@ claude-profile - Claude Code 配置文件管理器
   }
 }
 
+/**
+ * @param {string[]} args
+ * @param {string} arg
+ * @returns {string | undefined}
+ */
 function getArgValue(args, arg) {
   const index = args.indexOf(arg);
   if (index >= 0 && index < args.length - 1) {
@@ -202,6 +268,6 @@ function getArgValue(args, arg) {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error('Fatal error:', error.message || error);
   process.exit(1);
 });

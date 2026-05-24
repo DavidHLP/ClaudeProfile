@@ -6,6 +6,7 @@ import { runCommand } from './runner.js';
 import { FileOperationError, ProfileAlreadyExistsError, AppError } from '../errors.js';
 import { Profile } from '../types/index.js';
 import * as YAML from 'yaml';
+import { validateProfileName, validateEnvKey, validateEnvValue } from '../utils/validation.js';
 
 function detectFormat(inputPath: string, format?: 'json' | 'yaml'): 'json' | 'yaml' {
   if (format) return format;
@@ -16,9 +17,9 @@ function detectFormat(inputPath: string, format?: 'json' | 'yaml'): 'json' | 'ya
 
 function parseProfileFile(content: string, format: 'json' | 'yaml'): Partial<Profile> {
   if (format === 'yaml') {
-    return YAML.parse(content);
+    return YAML.parse(content, { schema: 'core' }) as Partial<Profile>;
   }
-  return JSON.parse(content);
+  return JSON.parse(content) as Partial<Profile>;
 }
 
 function validateImportedProfile(data: unknown): data is Profile {
@@ -57,8 +58,26 @@ export async function importFileCommand(input: ImportProfileInput): Promise<Comm
     // Use provided profile name or the one from file
     const profileName = input.profileName?.trim() || parsed.name;
 
+    // Validate profile name
+    const nameError = validateProfileName(profileName);
+    if (nameError) {
+      throw new AppError(nameError.message, nameError.code);
+    }
+
+    // Validate env keys and values
+    for (const [key, value] of Object.entries(parsed.env as Record<string, unknown>)) {
+      const keyError = validateEnvKey(key);
+      if (keyError) {
+        throw new AppError(keyError.message, keyError.code);
+      }
+      const valueError = validateEnvValue(value);
+      if (valueError) {
+        throw new AppError(valueError.message, valueError.code);
+      }
+    }
+
     // Check if profile already exists
-    if (profileService.profileExists(profileName) && profileName !== parsed.name) {
+    if (profileService.profileExists(profileName) && !input.force) {
       throw new ProfileAlreadyExistsError(profileName);
     }
 
@@ -98,5 +117,5 @@ export async function importFileCommandInteractive(): Promise<CommandResult> {
     return { success: false, error: '已取消导入。', wasCancelled: true };
   }
 
-  return importFileCommand({ inputPath, format });
+  return importFileCommand({ inputPath, format, force: true });
 }

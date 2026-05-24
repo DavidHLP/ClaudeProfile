@@ -32,9 +32,13 @@ export interface EditProfileInput {
   value: string;
 }
 
+import type { SettingsScope } from '../config/claudeSettingsStore.js';
+
 export interface SwitchProfileInput {
   profileName: string;
   syncToSettings?: boolean;
+  scope?: SettingsScope;
+  dryRun?: boolean;
 }
 
 export interface DeleteProfileInput {
@@ -62,6 +66,7 @@ export interface ImportProfileInput {
   inputPath: string;
   format?: 'json' | 'yaml';
   profileName?: string;
+  force?: boolean;
 }
 
 export interface BackupConfigInput {

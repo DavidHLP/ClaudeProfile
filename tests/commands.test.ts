@@ -40,11 +40,12 @@ vi.mock('../src/services/profileService.js', () => ({
 
 // Mock the settingsSyncService
 const mockSettingsSyncService = {
-  syncOnSwitch: vi.fn(),
+  syncOnSwitch: vi.fn().mockReturnValue({ success: true }),
 };
 
 vi.mock('../src/services/settingsSyncService.js', () => ({
   settingsSyncService: mockSettingsSyncService,
+  createSettingsSyncService: vi.fn().mockReturnValue(mockSettingsSyncService),
 }));
 
 describe('Commands', () => {
@@ -137,23 +138,57 @@ describe('Commands', () => {
       const result = await switchCommand({ profileName: 'test-profile' }, false);
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('unset API_TIMEOUT_MS');
+      if (result.success) { expect(result.output).toContain('unset API_TIMEOUT_MS'); };
     });
 
-    it('should not call syncOnSwitch by default', async () => {
+    it('should call syncOnSwitch by default', async () => {
       const { switchCommand } = await import('../src/commands/switch.js');
       await switchCommand({ profileName: 'test-profile' }, true);
+
+      expect(mockSettingsSyncService.syncOnSwitch).toHaveBeenCalled();
+    });
+
+    it('should not call syncOnSwitch when syncToSettings is false', async () => {
+      const { switchCommand } = await import('../src/commands/switch.js');
+      await switchCommand({ profileName: 'test-profile', syncToSettings: false }, true);
 
       expect(mockSettingsSyncService.syncOnSwitch).not.toHaveBeenCalled();
     });
 
-    it('should call syncOnSwitch when syncToSettings is true', async () => {
+    it('should call syncOnSwitch when syncToSettings is explicitly true', async () => {
       const { switchCommand } = await import('../src/commands/switch.js');
       await switchCommand({ profileName: 'test-profile', syncToSettings: true }, true);
 
       expect(mockSettingsSyncService.syncOnSwitch).toHaveBeenCalled();
       const [oldEnv, newEnv] = mockSettingsSyncService.syncOnSwitch.mock.calls[0];
       expect(newEnv.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
+    });
+
+    it('should not call setCurrentProfile in dry-run mode', async () => {
+      const { switchCommand } = await import('../src/commands/switch.js');
+      const result = await switchCommand({ profileName: 'test-profile', dryRun: true }, true);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output).toContain('dry-run');
+      }
+      expect(mockProfileService.setCurrentProfile).not.toHaveBeenCalled();
+      expect(mockSettingsSyncService.syncOnSwitch).not.toHaveBeenCalled();
+    });
+
+    it('should not call syncOnSwitch in dry-run mode even with syncToSettings true', async () => {
+      const { switchCommand } = await import('../src/commands/switch.js');
+      await switchCommand({ profileName: 'test-profile', syncToSettings: true, dryRun: true }, true);
+
+      expect(mockProfileService.setCurrentProfile).not.toHaveBeenCalled();
+      expect(mockSettingsSyncService.syncOnSwitch).not.toHaveBeenCalled();
+    });
+
+    it('should use scoped syncService when scope is provided', async () => {
+      const { switchCommand } = await import('../src/commands/switch.js');
+      await switchCommand({ profileName: 'test-profile', scope: 'project' }, true);
+
+      expect(mockProfileService.setCurrentProfile).toHaveBeenCalledWith('test-profile');
     });
   });
 
@@ -330,7 +365,7 @@ describe('Commands', () => {
 
       expect(result.success).toBe(true);
       expect(result.output).toContain('if [ "$1" = "switch" ]');
-      expect(result.output).toContain('eval "$export_output"');
+      expect(result.output).toContain('_claude_profile_safe_eval');
     });
 
     it('should include export command handler', async () => {
@@ -380,7 +415,7 @@ describe('Commands', () => {
       const result = await exportCommand({ profileName: 'non-existent' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('不存在');
+      if (!result.success) { expect(result.error).toContain('不存在'); };
     });
   });
 
@@ -416,7 +451,7 @@ describe('Commands', () => {
       const result = await exportCurrentCommand();
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('不存在');
+      if (!result.success) { expect(result.error).toContain('不存在'); };
     });
 
     it('should include unset commands when previous profile differs', async () => {
@@ -442,7 +477,7 @@ describe('Commands', () => {
       const result = await exportCurrentCommand();
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('unset API_TIMEOUT_MS');
+      if (result.success) { expect(result.output).toContain('unset API_TIMEOUT_MS'); };
       expect(mockProfileService.setPreviousProfile).toHaveBeenCalledWith(null);
     });
   });
@@ -455,7 +490,7 @@ describe('Commands', () => {
       const result = await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('renamed-profile');
+      if (result.success) { expect(result.output).toContain('renamed-profile'); };
       expect(mockProfileService.saveProfile).toHaveBeenCalled();
       expect(mockProfileService.deleteProfile).toHaveBeenCalledWith('test-profile');
     });
@@ -480,7 +515,7 @@ describe('Commands', () => {
       const result = await renameCommand({ oldName: 'non-existent', newName: 'new-name' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('不存在');
+      if (!result.success) { expect(result.error).toContain('不存在'); };
     });
 
     it('should return error when new name already exists', async () => {
@@ -490,7 +525,7 @@ describe('Commands', () => {
       const result = await renameCommand({ oldName: 'test-profile', newName: 'existing-name' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('已存在');
+      if (!result.success) { expect(result.error).toContain('已存在'); };
     });
 
     it('should not mutate original profile', async () => {
@@ -526,7 +561,7 @@ describe('Commands', () => {
       const result = await duplicateCommand({ sourceName: 'test-profile', newName: 'copy-profile' });
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('copy-profile');
+      if (result.success) { expect(result.output).toContain('copy-profile'); };
       expect(mockProfileService.saveProfile).toHaveBeenCalled();
     });
 
@@ -554,7 +589,7 @@ describe('Commands', () => {
       const result = await duplicateCommand({ sourceName: 'non-existent', newName: 'new-name' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('不存在');
+      if (!result.success) { expect(result.error).toContain('不存在'); };
     });
 
     it('should return error when new name already exists', async () => {
@@ -564,7 +599,7 @@ describe('Commands', () => {
       const result = await duplicateCommand({ sourceName: 'test-profile', newName: 'existing-name' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('已存在');
+      if (!result.success) { expect(result.error).toContain('已存在'); };
     });
 
     it('should not mutate original profile', async () => {

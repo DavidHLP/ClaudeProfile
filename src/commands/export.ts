@@ -1,26 +1,32 @@
 import { writeFileSync } from 'fs';
 import { profileService } from '../services/profileService.js';
-import { envPresenter, buildExportCommands, buildSwitchCommands } from '../presenters/envPresenter.js';
+import { envPresenter, buildExportCommands, buildSwitchCommands, buildExportJson, buildSwitchJson } from '../presenters/envPresenter.js';
 import { CommandResult, ExportFileInput } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { resolveOldEnv } from '../engine/activation.js';
-import { FileOperationError, AppError } from '../errors.js';
+import { FileOperationError } from '../errors.js';
 import * as YAML from 'yaml';
 
 export interface ExportProfileInput {
   profileName: string;
+  json?: boolean;
 }
 
 export async function exportCommand(input: ExportProfileInput): Promise<CommandResult> {
   return runCommand('导出配置', async () => {
     const profile = profileService.getProfile(input.profileName);
 
+    if (input.json) {
+      const jsonOutput = buildExportJson(profile.env);
+      return { success: true, output: JSON.stringify(jsonOutput) };
+    }
+
     const exportCommands = buildExportCommands(profile.env);
     return { success: true, output: exportCommands };
   });
 }
 
-export async function exportCurrentCommand(): Promise<CommandResult> {
+export async function exportCurrentCommand(input: { json?: boolean } = {}): Promise<CommandResult> {
   return runCommand('导出当前配置', async () => {
     const currentProfile = profileService.getCurrentProfile();
     if (!currentProfile) {
@@ -34,6 +40,11 @@ export async function exportCurrentCommand(): Promise<CommandResult> {
 
     // Clean up .current-prev after use
     profileService.setPreviousProfile(null);
+
+    if (input.json) {
+      const jsonOutput = buildSwitchJson(oldEnv, profile.env);
+      return { success: true, output: JSON.stringify(jsonOutput) };
+    }
 
     const exportCommands = buildSwitchCommands(oldEnv, profile.env);
     return { success: true, output: exportCommands };
