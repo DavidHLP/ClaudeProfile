@@ -340,7 +340,10 @@ describe('PluginHooks', () => {
 
   it('handles hook errors gracefully', async () => {
     const { PluginManager } = await import('../src/plugins/manager.js');
-    const manager = new PluginManager();
+    const capturedErrors: Array<{ pluginId: string; hookName: string; error: unknown }> = [];
+    const manager = new PluginManager((pluginId, hookName, error) => {
+      capturedErrors.push({ pluginId, hookName, error });
+    });
 
     const errorHook = vi.fn(() => {
       throw new Error('Hook error');
@@ -378,6 +381,11 @@ describe('PluginHooks', () => {
 
     // Should not throw, but should log error and continue
     await manager.callHook('onProfileSwitch', { profile: 'test', previousProfile: null });
+
+    // Error should have been captured via onError callback
+    expect(capturedErrors).toHaveLength(1);
+    expect(capturedErrors[0].pluginId).toBe('error-hook-plugin');
+    expect(capturedErrors[0].hookName).toBe('onProfileSwitch');
 
     // Normal hook should still be called even if error hook failed
     expect(normalHook).toHaveBeenCalled();
