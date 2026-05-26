@@ -24,7 +24,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "inquirer": "^9.2.0",
+    "inquirer": "^14.0.0",
     "tar": "^7.5.15",
     "tar-fs": "^3.1.2",
     "yaml": "^2.9.0"
