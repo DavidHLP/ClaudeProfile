@@ -67,6 +67,21 @@ export const providerTemplates: ProviderTemplate[] = [
     },
   },
   {
+    id: 'xiaomi',
+    name: '小米',
+    description: '小米 Token Plan API',
+    defaultBaseUrl: 'https://token-plan-cn.xiaomimimo.com/anthropic',
+    defaultModel: 'mimo-v2.5-pro',
+    envTemplate: {
+      ANTHROPIC_BASE_URL: 'https://token-plan-cn.xiaomimimo.com/anthropic',
+      ANTHROPIC_AUTH_TOKEN: 'MIMO_API_KEY',
+      ANTHROPIC_MODEL: 'mimo-v2.5-pro',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.5-pro',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.5-pro',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'mimo-v2.5-pro',
+    },
+  },
+  {
     id: 'custom',
     name: '自定义',
     description: '手动配置所有参数',
