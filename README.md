@@ -5,7 +5,7 @@ Claude Code 配置文件管理器 - 交互式管理多 API 配置
 ## 功能
 
 - 交互式创建、编辑、删除 API 配置
-- 支持多个 Provider: MiniMax、Kimi (Moonshot)、阿里云百炼、火山引擎、讯飞星辰等
+- 支持多个 Provider: MiniMax、Kimi (Moonshot)、阿里云百炼、火山引擎、讯飞星辰、小米、智谱 GLM 等
 - 密码式 Token 输入，安全可靠
 - 无缝切换环境变量，一条命令完成配置
 - **自动同步到 Claude Code settings.json**（支持 VSCode 和 Zed 扩展）
