@@ -9,6 +9,9 @@ export interface EnvConfig {
   CLAUDE_CODE_SUBAGENT_MODEL?: string;
   API_TIMEOUT_MS?: string;
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC?: string;
+  // Claude Code v2.1.69 BUG 规避：https://github.com/anthropics/claude-code/issues/30926
+  ENABLE_TOOL_SEARCH?: string;
+  CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS?: string;
 }
 
 export interface Profile {

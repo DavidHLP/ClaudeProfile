@@ -1,4 +1,5 @@
 import { ProviderTemplate } from '../types/index.js';
+import { baseEnvTemplate } from './baseEnvTemplate.js';
 
 export const providerTemplates: ProviderTemplate[] = [
   {
@@ -6,13 +7,12 @@ export const providerTemplates: ProviderTemplate[] = [
     name: 'MiniMax',
     description: 'MiniMax API',
     defaultBaseUrl: 'https://api.minimaxi.com/anthropic',
-    defaultModel: 'MiniMax-M3',
+    defaultModel: 'MiniMax-M3[1M]',
     envTemplate: {
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'MiniMax-M3',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'MiniMax-M3',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'MiniMax-M3',
-      API_TIMEOUT_MS: '3000000',
-      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+      ...baseEnvTemplate,
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'MiniMax-M3[1M]',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'MiniMax-M3[1M]',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'MiniMax-M3[1M]',
     },
   },
   {
@@ -22,6 +22,7 @@ export const providerTemplates: ProviderTemplate[] = [
     defaultBaseUrl: 'https://api.kimi.com/coding/',
     defaultModel: 'kimi-k2.5',
     envTemplate: {
+      ...baseEnvTemplate,
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.5',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2.5',
@@ -35,6 +36,7 @@ export const providerTemplates: ProviderTemplate[] = [
     defaultBaseUrl: 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic',
     defaultModel: 'qwen3.6-plus',
     envTemplate: {
+      ...baseEnvTemplate,
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3.6-plus',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3.6-plus',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3.6-plus',
@@ -48,6 +50,7 @@ export const providerTemplates: ProviderTemplate[] = [
     defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/coding',
     defaultModel: 'GLM-5.1',
     envTemplate: {
+      ...baseEnvTemplate,
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'MiniMax-M2.7',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'GLM-5.1',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'MiniMax-M2.7',
@@ -60,6 +63,7 @@ export const providerTemplates: ProviderTemplate[] = [
     defaultBaseUrl: 'https://maas-coding-api.cn-huabei-1.xf-yun.com/anthropic',
     defaultModel: 'astron-code-latest',
     envTemplate: {
+      ...baseEnvTemplate,
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'astron-code-latest',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'astron-code-latest',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'astron-code-latest',
@@ -73,12 +77,23 @@ export const providerTemplates: ProviderTemplate[] = [
     defaultBaseUrl: 'https://token-plan-cn.xiaomimimo.com/anthropic',
     defaultModel: 'mimo-v2.5-pro',
     envTemplate: {
-      ANTHROPIC_BASE_URL: 'https://token-plan-cn.xiaomimimo.com/anthropic',
-      ANTHROPIC_AUTH_TOKEN: 'MIMO_API_KEY',
-      ANTHROPIC_MODEL: 'mimo-v2.5-pro',
+      ...baseEnvTemplate,
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.5-pro',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.5-pro',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'mimo-v2.5-pro',
+    },
+  },
+  {
+    id: 'zai',
+    name: 'z.ai(China)',
+    description: '智谱 GLM Coding Plan API',
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
+    defaultModel: 'glm-5.1',
+    envTemplate: {
+      ...baseEnvTemplate,
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.1',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-5-turbo',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'glm-4.5-air',
     },
   },
   {
