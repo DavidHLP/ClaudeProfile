@@ -195,7 +195,7 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
     return `
   ${icon.arrow} 已切换到: ${theme.active(profileName)}
 
-  ${theme.dim('(环境变量已同步)')}
+  ${theme.dim('(环境变量已注入当前 shell)')}
 `;
   }
 

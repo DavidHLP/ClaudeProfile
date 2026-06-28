@@ -1,6 +1,8 @@
 import { CommandResult } from '../types/command.js';
+import { baseEnvTemplate } from '../templates/baseEnvTemplate.js';
+import { shellQuote, validateEnvKeyOrThrow } from '../utils/shellSafety.js';
 
-const SHELL_HOOK = [
+const SHELL_HOOK_CORE = [
   '_claude_profile_bin() {',
   '  if [ -n "$CLAUDE_PROFILE_BIN" ]; then',
   '    echo "$CLAUDE_PROFILE_BIN"',
@@ -120,9 +122,34 @@ const SHELL_HOOK = [
   '}',
 ].join('\n');
 
+/**
+ * 从 baseEnvTemplate 渲染"默认 env 基线注入"段。
+ *
+ * 在 shell hook 注册时（eval "$(claude-profile init)"）就把跨 provider 通用的高性能配置
+ * 注入当前 shell，让未配置任何 profile 的用户也能开箱即用。这些键与 provider 业务无关
+ * （BUG 规避 / 超时窗口 / 关闭非必要流量），不属于 model/api/key，适合作为默认基线。
+ *
+ * 守卫语义：[ -z "${VAR+set}" ] 仅当变量完全未赋值时才设默认，尊重用户已设值（含空值/0）。
+ * 总开关：CLAUDE_PROFILE_DEFAULT_ENV=0 可完全关闭默认注入。
+ */
+function buildDefaultEnvBlock(): string {
+  const lines: string[] = [
+    '',
+    '# 默认注入通用高性能 env 基线（不覆盖用户已设值；CLAUDE_PROFILE_DEFAULT_ENV=0 可关闭）',
+    'if [ "${CLAUDE_PROFILE_DEFAULT_ENV:-1}" != "0" ]; then',
+  ];
+  for (const [key, value] of Object.entries(baseEnvTemplate)) {
+    if (!value) continue;
+    validateEnvKeyOrThrow(key);
+    lines.push(`  [ -z "\${${key}+set}" ] && export ${key}=${shellQuote(value)}`);
+  }
+  lines.push('fi');
+  return lines.join('\n');
+}
+
 export async function initCommand(): Promise<CommandResult> {
   return {
     success: true,
-    output: SHELL_HOOK,
+    output: SHELL_HOOK_CORE + buildDefaultEnvBlock(),
   };
 }

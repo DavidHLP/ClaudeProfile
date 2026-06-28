@@ -32,12 +32,8 @@ export interface EditProfileInput {
   value: string;
 }
 
-import type { SettingsScope } from '../config/claudeSettingsStore.js';
-
 export interface SwitchProfileInput {
   profileName: string;
-  syncToSettings?: boolean;
-  scope?: SettingsScope;
   dryRun?: boolean;
 }
 

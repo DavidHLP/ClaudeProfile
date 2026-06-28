@@ -104,21 +104,6 @@ function checkHook(): CheckResult {
   return { name: 'Shell Hook', status: 'ok', message: '已加载' };
 }
 
-function checkSettingsSync(): CheckResult {
-  const settingsPath = join(homedir(), '.claude', 'settings.json');
-  if (!existsSync(settingsPath)) {
-    return { name: 'Settings Sync', status: 'warning', message: 'settings.json 不存在', suggestion: '切换配置会自动创建' };
-  }
-  try {
-    const content = readFileSync(settingsPath, 'utf-8');
-    const parsed = JSON.parse(content);
-    const envKeys = Object.keys(parsed.env || {});
-    return { name: 'Settings Sync', status: 'ok', message: `settings.json 存在，包含 ${envKeys.length} 个环境变量` };
-  } catch {
-    return { name: 'Settings Sync', status: 'error', message: 'settings.json 损坏', suggestion: '删除后重新同步' };
-  }
-}
-
 function checkGitRepo(): CheckResult {
   try {
     const gitDir = join(process.cwd(), '.git');
@@ -160,7 +145,6 @@ export async function doctorCommand(): Promise<CommandResult> {
       checkProfiles(),
       checkCurrentProfile(),
       checkHook(),
-      checkSettingsSync(),
       checkGitRepo(),
       checkEnvConsistency(),
     ];

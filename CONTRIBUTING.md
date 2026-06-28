@@ -80,12 +80,12 @@ npx vitest run --coverage
 src/
 ├── commands/      CLI command handlers
 ├── config/        ConfigStore interface + implementations
-├── engine/        Core logic (settingsSync, activation)
+├── engine/        Core logic (activation)
 ├── errors.ts      Custom error hierarchy
 ├── index.ts       Public API exports
 ├── plugins/       Plugin system (types, loader, manager, discovery, validator)
 ├── presenters/    UI output formatting (ANSI tables, env export)
-├── services/      Business services (ProfileService, SettingsSyncService)
+├── services/      Business services (ProfileService)
 ├── templates/     Provider templates + env template engine
 ├── types/         TypeScript type definitions
 ├── ui/            Interactive prompts (inquirer wrappers)

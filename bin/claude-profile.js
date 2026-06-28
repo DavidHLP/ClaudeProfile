@@ -14,7 +14,6 @@ import { initCommand } from '../dist/commands/init.js';
 import { validateCommand } from '../dist/commands/validate.js';
 import { completionCommand } from '../dist/commands/completion.js';
 import { runProfileCommand, execProfileCommand } from '../dist/commands/run.js';
-import { syncCommand } from '../dist/commands/sync.js';
 import { doctorCommand } from '../dist/commands/doctor.js';
 import { statusCommand } from '../dist/commands/status.js';
 
@@ -41,10 +40,8 @@ async function main() {
         result = await switchCommandInteractive();
       } else {
         const profileName = args[1];
-        const syncToSettings = !args.includes('--no-sync');
-        const scope = getArgValue(args, '--scope');
         const dryRun = args.includes('--dry-run');
-        result = await switchCommand({ profileName, syncToSettings, scope, dryRun });
+        result = await switchCommand({ profileName, dryRun });
       }
       break;
 
@@ -164,18 +161,6 @@ async function main() {
       break;
     }
 
-    case 'sync': {
-      const profileName = args[1];
-      const scope = getArgValue(args, '--scope');
-      const dryRun = args.includes('--dry-run');
-      if (!profileName) {
-        result = { success: false, error: '用法: claude-profile sync <配置名> [--scope user|project|local] [--dry-run]' };
-      } else {
-        result = await syncCommand({ profileName, scope, dryRun });
-      }
-      break;
-    }
-
     case 'doctor':
       result = await doctorCommand();
       break;
@@ -195,8 +180,8 @@ claude-profile - Claude Code 配置文件管理器
 
 命令:
   create       创建新配置（交互式）
-  switch       切换配置（无参数时进入交互模式）
-               [--no-sync 不同步到 settings.json] [--scope user|project|local] [--dry-run]
+  switch       切换配置（无参数时进入交互模式，通过 shell hook 注入环境变量）
+               [--dry-run]
   list         列出所有配置
   edit         编辑配置
   delete       删除配置
@@ -208,12 +193,18 @@ claude-profile - Claude Code 配置文件管理器
   restore      恢复配置: restore [备份路径]
   run          以指定配置运行命令: run <配置名> -- <命令...> [--no-inherit-env] [--print-env]
   exec         run 的别名
-  sync         同步配置到 settings.json: sync <配置名> [--scope user|project|local] [--dry-run]
   doctor       运行诊断检查
   status       显示当前状态
-  init         输出 shell hook 脚本
+  init         输出 shell hook 脚本（注入环境变量到当前 shell；含通用高性能默认配置）
   validate     验证所有配置完整性
   completion   生成 shell 自动补全脚本 (bash/zsh/fish)
+
+环境变量注入:
+  环境变量通过 shell hook 注入当前 shell，不再写入 ~/.claude/settings.json。
+  在 ~/.bashrc 或 ~/.zshrc 中添加:  eval "$(claude-profile init)"
+  init 时自动注入通用高性能默认配置（BUG 规避/超时/关流量/默认 effort=max/75% 自动压缩），无需 switch 即生效；
+  设 CLAUDE_PROFILE_DEFAULT_ENV=0 可关闭，已设的同名变量不会被覆盖。
+  之后:  claude-profile switch <配置名>   即可将该配置的环境变量注入当前 shell。
 
 全局选项:
   -h, --help         显示帮助信息
@@ -226,8 +217,7 @@ claude-profile - Claude Code 配置文件管理器
   claude-profile list --verbose
   claude-profile delete my-profile --yes
   claude-profile validate -v
-  claude-profile switch minimax --scope project
-  claude-profile sync minimax --dry-run
+  claude-profile switch minimax
   claude-profile doctor
   claude-profile status
   claude-profile completion bash > /etc/bash_completion.d/claude-profile
