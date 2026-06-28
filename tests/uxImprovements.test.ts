@@ -36,15 +36,6 @@ vi.mock('../src/services/profileService.js', () => ({
   profileService: mockProfileService,
 }));
 
-// Mock the settingsSyncService
-const mockSettingsSyncService = {
-  syncOnSwitch: vi.fn(),
-};
-
-vi.mock('../src/services/settingsSyncService.js', () => ({
-  settingsSyncService: mockSettingsSyncService,
-}));
-
 describe('UX Improvements', () => {
   beforeEach(() => {
     vi.clearAllMocks();

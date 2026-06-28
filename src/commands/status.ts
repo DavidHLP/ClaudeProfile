@@ -1,16 +1,7 @@
 import { profileService } from '../services/profileService.js';
 import { CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
-import { ClaudeSettingsStoreImpl, isValidSettingsScope } from '../config/claudeSettingsStore.js';
 import { maskValue } from '../utils/sensitiveKeys.js';
-
-function readSettingsEnv(scope: string): Record<string, string> {
-  if (!isValidSettingsScope(scope)) {
-    return {};
-  }
-  const store = new ClaudeSettingsStoreImpl(scope);
-  return store.readEnv();
-}
 
 export async function statusCommand(): Promise<CommandResult> {
   return runCommand('状态查询', async () => {
@@ -27,30 +18,19 @@ export async function statusCommand(): Promise<CommandResult> {
     lines.push(`  配置数量: ${profiles.length}`);
     lines.push('');
 
-    // Shell env
+    // Shell env —— 唯一注入来源（通过 shell hook / eval bridge）
     const shellEnv: Record<string, string> = {};
     for (const key of Object.keys(process.env)) {
       if (key.startsWith('ANTHROPIC_') || key.startsWith('CLAUDE_CODE_')) {
         shellEnv[key] = process.env[key] || '';
       }
     }
-    lines.push('  Shell 环境变量:');
+    lines.push('  Shell 环境变量 (注入来源):');
     if (Object.keys(shellEnv).length === 0) {
       lines.push('    无 ANTHROPIC_* / CLAUDE_CODE_* 变量');
     } else {
       for (const [key, value] of Object.entries(shellEnv)) {
         lines.push(`    ${key}=${maskValue(key, value) || '空'}`);
-      }
-    }
-    lines.push('');
-
-    // Settings.json scopes
-    for (const scope of ['user', 'project', 'local']) {
-      const env = readSettingsEnv(scope);
-      const keys = Object.keys(env).filter(k => k.startsWith('ANTHROPIC_') || k.startsWith('CLAUDE_CODE_'));
-      lines.push(`  settings.json (${scope}): ${keys.length} 个变量`);
-      for (const key of keys) {
-        lines.push(`    ${key}=${env[key] ? '***' : '空'}`);
       }
     }
     lines.push('');

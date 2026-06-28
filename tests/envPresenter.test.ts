@@ -267,7 +267,7 @@ describe('EnvPresenter', () => {
       expect(result).toContain('❯');
       expect(result).toContain('已切换到');
       expect(result).toContain('test-profile');
-      expect(result).toContain('环境变量已同步');
+      expect(result).toContain('环境变量已注入当前 shell');
     });
   });
 

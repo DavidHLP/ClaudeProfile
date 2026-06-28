@@ -38,16 +38,6 @@ vi.mock('../src/services/profileService.js', () => ({
   profileService: mockProfileService,
 }));
 
-// Mock the settingsSyncService
-const mockSettingsSyncService = {
-  syncOnSwitch: vi.fn().mockReturnValue({ success: true }),
-};
-
-vi.mock('../src/services/settingsSyncService.js', () => ({
-  settingsSyncService: mockSettingsSyncService,
-  createSettingsSyncService: vi.fn().mockReturnValue(mockSettingsSyncService),
-}));
-
 describe('Commands', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -141,29 +131,6 @@ describe('Commands', () => {
       if (result.success) { expect(result.output).toContain('unset API_TIMEOUT_MS'); };
     });
 
-    it('should call syncOnSwitch by default', async () => {
-      const { switchCommand } = await import('../src/commands/switch.js');
-      await switchCommand({ profileName: 'test-profile' }, true);
-
-      expect(mockSettingsSyncService.syncOnSwitch).toHaveBeenCalled();
-    });
-
-    it('should not call syncOnSwitch when syncToSettings is false', async () => {
-      const { switchCommand } = await import('../src/commands/switch.js');
-      await switchCommand({ profileName: 'test-profile', syncToSettings: false }, true);
-
-      expect(mockSettingsSyncService.syncOnSwitch).not.toHaveBeenCalled();
-    });
-
-    it('should call syncOnSwitch when syncToSettings is explicitly true', async () => {
-      const { switchCommand } = await import('../src/commands/switch.js');
-      await switchCommand({ profileName: 'test-profile', syncToSettings: true }, true);
-
-      expect(mockSettingsSyncService.syncOnSwitch).toHaveBeenCalled();
-      const [oldEnv, newEnv] = mockSettingsSyncService.syncOnSwitch.mock.calls[0];
-      expect(newEnv.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
-    });
-
     it('should not call setCurrentProfile in dry-run mode', async () => {
       const { switchCommand } = await import('../src/commands/switch.js');
       const result = await switchCommand({ profileName: 'test-profile', dryRun: true }, true);
@@ -173,22 +140,18 @@ describe('Commands', () => {
         expect(result.output).toContain('dry-run');
       }
       expect(mockProfileService.setCurrentProfile).not.toHaveBeenCalled();
-      expect(mockSettingsSyncService.syncOnSwitch).not.toHaveBeenCalled();
     });
 
-    it('should not call syncOnSwitch in dry-run mode even with syncToSettings true', async () => {
+    it('should not write settings.json (env injected via shell only)', async () => {
+      // switch 不再导入或调用 settingsSyncService —— 仅通过输出 export/unset 注入 shell。
       const { switchCommand } = await import('../src/commands/switch.js');
-      await switchCommand({ profileName: 'test-profile', syncToSettings: true, dryRun: true }, true);
+      const result = await switchCommand({ profileName: 'test-profile' }, false);
 
-      expect(mockProfileService.setCurrentProfile).not.toHaveBeenCalled();
-      expect(mockSettingsSyncService.syncOnSwitch).not.toHaveBeenCalled();
-    });
-
-    it('should use scoped syncService when scope is provided', async () => {
-      const { switchCommand } = await import('../src/commands/switch.js');
-      await switchCommand({ profileName: 'test-profile', scope: 'project' }, true);
-
-      expect(mockProfileService.setCurrentProfile).toHaveBeenCalledWith('test-profile');
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output).toMatch(/^export ANTHROPIC_/);
+        expect(result.output).not.toContain('settings.json');
+      }
     });
   });
 
@@ -392,6 +355,38 @@ describe('Commands', () => {
       expect(result.success).toBe(true);
       // Non-interactive path should use $bin switch, not $bin export
       expect(result.output).toMatch(/\$bin switch "\$profile"/);
+    });
+
+    it('should inject default env baseline from baseEnvTemplate', async () => {
+      const { initCommand } = await import('../src/commands/init.js');
+      const result = await initCommand();
+
+      expect(result.success).toBe(true);
+      // 总开关：默认开，未设时取 1
+      expect(result.output).toContain('CLAUDE_PROFILE_DEFAULT_ENV');
+      expect(result.output).toContain('"${CLAUDE_PROFILE_DEFAULT_ENV:-1}"');
+      // 4 个通用基线键的 export 行
+      expect(result.output).toContain("export ENABLE_TOOL_SEARCH='0'");
+      expect(result.output).toContain("export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS='1'");
+      expect(result.output).toContain("export API_TIMEOUT_MS='3000000'");
+      expect(result.output).toContain("export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'");
+      expect(result.output).toContain("export CLAUDE_CODE_EFFORT_LEVEL='max'");
+      expect(result.output).toContain("export CLAUDE_CODE_ALWAYS_ENABLE_EFFORT='1'");
+      expect(result.output).toContain("export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE='75'");
+      // 不覆盖守卫：仅当变量完全未赋值（${VAR+set}）才设默认
+      expect(result.output).toContain('[ -z "${ENABLE_TOOL_SEARCH+set}" ]');
+      expect(result.output).toContain('[ -z "${API_TIMEOUT_MS+set}" ]');
+    });
+
+    it('should not include personal keys (model/api/token) in default baseline', async () => {
+      const { initCommand } = await import('../src/commands/init.js');
+      const result = await initCommand();
+
+      expect(result.success).toBe(true);
+      // 个性化键不应出现在默认注入段（它们必须由 profile 提供）
+      expect(result.output).not.toContain('export ANTHROPIC_BASE_URL=');
+      expect(result.output).not.toContain('export ANTHROPIC_AUTH_TOKEN=');
+      expect(result.output).not.toContain('export ANTHROPIC_MODEL=');
     });
   });
 
