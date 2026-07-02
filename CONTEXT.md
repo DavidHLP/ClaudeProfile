@@ -253,6 +253,38 @@ non-profile flows render an inquirer list inline. **Every
 flow; the list/empty/select/confirm/return-cancelled sequence is
 never re-implemented by hand.**
 
+### Status Report
+The multi-section status block that `statusCommand` emits: a
+"当前状态" header, a 3-line context block (current profile / config
+dir / profile count), and a "Shell 环境变量 (注入来源)" block listing
+the Claude env keys currently in the shell. Owned by
+`EnvPresenter.formatStatus` (ADR-0010). The caller supplies
+`currentProfile`, `storeLocation`, `profileCount`, the
+pre-filtered `shellEnv` from `domain/shellEnv.ts`, and the
+`maskValue` function. The seam trusts the filter and the masking
+policy; it just renders. **The status block is never constructed
+inline in the command layer.**
+
+### Claude Env Key Prefix Set
+The canonical list of env-key prefixes that identify a "Claude env
+key" — an env var that `claude-profile` knows how to inject via
+the eval-bridge or that a Claude-related tool (Claude Code, etc.)
+reads. Exported as `CLAUDE_ENV_KEY_PREFIXES` from
+`domain/shellEnv.ts` as `['CLAUDE_CODE_', 'ANTHROPIC_']`. The
+order is longer-prefix-first so that future logic that walks the
+prefixes in order can rely on the most specific match winning.
+**The "is this a Claude env key?" question has exactly one
+answer; no command inlines the prefix list.**
+
+### Shell Env Extraction
+The pure `extractClaudeShellEnv(processEnv, prefixes?): Record<string, string>`
+function in `domain/shellEnv.ts` that filters a `process.env`-shaped
+bag down to the Claude-relevant subset. POSIX-invalid keys are
+silently dropped; empty / undefined values are dropped;
+whitespace-only values are kept (the shell is the source of
+truth). **The `startsWith('ANTHROPIC_')` / `startsWith('CLAUDE_CODE_')`
+iteration is never duplicated outside `extractClaudeShellEnv`.**
+
 ## Vocabulary discipline
 
 - Say **"Profile"**, not "config file" or "preset" or "account."

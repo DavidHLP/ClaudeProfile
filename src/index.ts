@@ -107,6 +107,12 @@ export {
   type DetailRow,
 } from './domain/profileSchema.js';
 
+// ── Shell env extraction (canonical "Claude env key" filter) ───
+export {
+  CLAUDE_ENV_KEY_PREFIXES,
+  extractClaudeShellEnv,
+} from './domain/shellEnv.js';
+
 // ── Interactive session (select / confirm / execute flow) ───
 export {
   runSelectableAction,

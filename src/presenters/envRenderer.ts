@@ -104,6 +104,42 @@ export interface EnvPresenter {
     readonly message: string;
     readonly suggestion?: string;
   }>): string;
+  /**
+   * Render the multi-section status block that `statusCommand` emits:
+   * a "当前状态" header, a 3-line context block (current profile /
+   * config dir / profile count), and a "Shell 环境变量 (注入来源)"
+   * block listing the Claude env keys currently in the shell.
+   *
+   * The caller supplies:
+   *   - `currentProfile` — the active profile name, or `null` if none.
+   *   - `storeLocation` — the config dir path, or `null` if unknown.
+   *   - `profileCount` — the number of saved profiles.
+   *   - `shellEnv` — the Claude env keys already filtered by
+   *     `domain/shellEnv.ts#extractClaudeShellEnv`. The presenter
+   *     trusts the filter and renders whatever it's handed.
+   *   - `maskValue` — the masking function from
+   *     `utils/sensitiveKeys.ts#maskValue`. The presenter
+   *     applies it to every shell-env value so sensitive keys
+   *     (`ANTHROPIC_AUTH_TOKEN`) never leak to stdout in cleartext.
+   *
+   * Output shape: 4 sections separated by blank lines, with
+   * leading and trailing blank lines. The shell-env block uses
+   * the same `无 … 变量` empty-state wording that the pre-seam
+   * command used, so user-facing output is identical.
+   *
+   * Why this exists: before this seam, `statusCommand` inlined an
+   * 8-line `lines.push(...)` block plus the `startsWith('ANTHROPIC_')`
+   * / `startsWith('CLAUDE_CODE_')` filter. The deletion test
+   * confirms it: remove this method and the block reappears in
+   * the command within 8 lines, including the prefix filter.
+   */
+  formatStatus(input: {
+    readonly currentProfile: string | null;
+    readonly storeLocation: string | null;
+    readonly profileCount: number;
+    readonly shellEnv: Readonly<Record<string, string>>;
+    readonly maskValue: (key: string, value: string | undefined) => string;
+  }): string;
 }
 
 class EnvPresenterImpl implements EnvPresenter {
@@ -345,6 +381,41 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
     lines.push('');
     lines.push(`  总结: ${ok} 通过, ${warnings} 警告, ${errors} 错误`);
     lines.push('');
+    return lines.join('\n');
+  }
+
+  formatStatus(input: {
+    readonly currentProfile: string | null;
+    readonly storeLocation: string | null;
+    readonly profileCount: number;
+    readonly shellEnv: Readonly<Record<string, string>>;
+    readonly maskValue: (key: string, value: string | undefined) => string;
+  }): string {
+    const lines: string[] = [];
+    lines.push('');
+    lines.push('  当前状态');
+    lines.push('');
+    lines.push(`  当前配置: ${input.currentProfile || '无'}`);
+    lines.push(`  配置目录: ${input.storeLocation || '未知'}`);
+    lines.push(`  配置数量: ${input.profileCount}`);
+    lines.push('');
+
+    // Shell env — the only injection source (via the shell hook /
+    // eval bridge). Keys are pre-filtered by
+    // `domain/shellEnv.ts#extractClaudeShellEnv`; the presenter
+    // just renders them, applying the same `maskValue` policy the
+    // `run --print-env` path uses so sensitive keys never leak to
+    // stdout in cleartext.
+    lines.push('  Shell 环境变量 (注入来源):');
+    if (Object.keys(input.shellEnv).length === 0) {
+      lines.push('    无 ANTHROPIC_* / CLAUDE_CODE_* 变量');
+    } else {
+      for (const [key, value] of Object.entries(input.shellEnv)) {
+        lines.push(`    ${key}=${input.maskValue(key, value) || '空'}`);
+      }
+    }
+    lines.push('');
+
     return lines.join('\n');
   }
 }

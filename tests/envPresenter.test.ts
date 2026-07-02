@@ -414,4 +414,107 @@ describe('EnvPresenter', () => {
       expect(result).not.toContain('❌');
     });
   });
+
+  describe('formatStatus', () => {
+    const noopMask = (_k: string, v: string | undefined) => v ?? '';
+
+    it('renders the 4-section status block with all 3 context lines', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'work',
+        storeLocation: '/home/u/.config/claude-profile',
+        profileCount: 3,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result).toContain('当前状态');
+      expect(result).toContain('当前配置: work');
+      expect(result).toContain('配置目录: /home/u/.config/claude-profile');
+      expect(result).toContain('配置数量: 3');
+    });
+
+    it('renders "无" / "未知" for null currentProfile / storeLocation', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: null,
+        storeLocation: null,
+        profileCount: 0,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result).toContain('当前配置: 无');
+      expect(result).toContain('配置目录: 未知');
+      expect(result).toContain('配置数量: 0');
+    });
+
+    it('renders the empty-state line when shellEnv is empty', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result).toContain('Shell 环境变量 (注入来源):');
+      expect(result).toContain('无 ANTHROPIC_* / CLAUDE_CODE_* 变量');
+    });
+
+    it('renders every shellEnv entry as KEY=value with leading indent', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {
+          ANTHROPIC_BASE_URL: 'https://api.test.com',
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku-1',
+        },
+        maskValue: noopMask,
+      });
+      expect(result).toContain('    ANTHROPIC_BASE_URL=https://api.test.com');
+      expect(result).toContain('    ANTHROPIC_DEFAULT_HAIKU_MODEL=haiku-1');
+      // The header must come before the entries.
+      expect(result.indexOf('Shell 环境变量')).toBeLessThan(
+        result.indexOf('ANTHROPIC_BASE_URL=')
+      );
+    });
+
+    it('applies maskValue to every shellEnv entry — sensitive keys never leak cleartext', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {
+          ANTHROPIC_AUTH_TOKEN: 'sk-supersecret',
+          ANTHROPIC_BASE_URL: 'https://api.test.com',
+        },
+        // Mimic the real `maskValue`: token → '*****', non-sensitive → as-is.
+        maskValue: (k, v) => (k === 'ANTHROPIC_AUTH_TOKEN' ? '*****' : v ?? ''),
+      });
+      expect(result).toContain('    ANTHROPIC_AUTH_TOKEN=*****');
+      expect(result).not.toContain('sk-supersecret');
+      // The non-sensitive key still renders normally.
+      expect(result).toContain('    ANTHROPIC_BASE_URL=https://api.test.com');
+    });
+
+    it('renders "空" when maskValue returns an empty string', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: { ANTHROPIC_BASE_URL: 'something' },
+        maskValue: () => '',
+      });
+      expect(result).toContain('ANTHROPIC_BASE_URL=空');
+    });
+
+    it('preserves the leading and trailing blank lines (drop-in for the command output)', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result.startsWith('\n')).toBe(true);
+      expect(result.endsWith('\n')).toBe(true);
+    });
+  });
 });
