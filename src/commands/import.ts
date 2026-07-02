@@ -1,12 +1,11 @@
 import { readFileSync } from 'fs';
-import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envRenderer.js';
 import { ImportProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { FileOperationError, ProfileAlreadyExistsError, AppError } from '../errors.js';
 import { Profile } from '../types/index.js';
 import * as YAML from 'yaml';
 import { validateProfileName, validateEnvKey, validateEnvValue } from '../utils/validation.js';
+import type { CommandContext } from './context.js';
 
 function detectFormat(inputPath: string, format?: 'json' | 'yaml'): 'json' | 'yaml' {
   if (format) return format;
@@ -30,7 +29,7 @@ function validateImportedProfile(data: unknown): data is Profile {
   return true;
 }
 
-export async function importFileCommand(input: ImportProfileInput): Promise<CommandResult> {
+export async function importFileCommand(ctx: CommandContext, input: ImportProfileInput): Promise<CommandResult> {
   return runCommand('导入配置', async () => {
     const format = detectFormat(input.inputPath, input.format);
 
@@ -77,7 +76,7 @@ export async function importFileCommand(input: ImportProfileInput): Promise<Comm
     }
 
     // Check if profile already exists
-    if (profileService.profileExists(profileName) && !input.force) {
+    if (ctx.profiles.profileExists(profileName) && !input.force) {
       throw new ProfileAlreadyExistsError(profileName);
     }
 
@@ -89,16 +88,14 @@ export async function importFileCommand(input: ImportProfileInput): Promise<Comm
     };
 
     // Save profile
-    profileService.saveProfile(profile);
+    ctx.profiles.saveProfile(profile);
 
-    return { success: true, output: envPresenter.formatImportSuccess(profileName, input.inputPath) };
+    return { success: true, output: ctx.env.formatImportSuccess(profileName, input.inputPath) };
   });
 }
 
-export async function importFileCommandInteractive(): Promise<CommandResult> {
-  const { promptInput, confirmAction } = await import('../ui/prompt.js');
-
-  const inputPath = await promptInput({
+export async function importFileCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
+  const inputPath = await ctx.prompts.promptInput({
     message: '请输入配置文件路径:',
     validate: (input: string) => {
       if (!input.trim()) return '路径不能为空';
@@ -112,10 +109,10 @@ export async function importFileCommandInteractive(): Promise<CommandResult> {
 
   const format = inputPath.toLowerCase().endsWith('.yaml') || inputPath.toLowerCase().endsWith('.yml') ? 'yaml' : 'json';
 
-  const confirmed = await confirmAction(`确定要从 '${inputPath}' 导入配置吗？`);
+  const confirmed = await ctx.prompts.confirmAction(`确定要从 '${inputPath}' 导入配置吗？`);
   if (!confirmed) {
     return { success: false, error: '已取消导入。', wasCancelled: true };
   }
 
-  return importFileCommand({ inputPath, format, force: true });
+  return importFileCommand(ctx, { inputPath, format, force: true });
 }

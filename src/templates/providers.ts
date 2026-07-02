@@ -1,3 +1,4 @@
+import type { Profile, EnvConfig } from '../types/index.js';
 import { ProviderTemplate } from '../types/index.js';
 import { baseEnvTemplate } from './baseEnvTemplate.js';
 
@@ -108,4 +109,45 @@ export const providerTemplates: ProviderTemplate[] = [
 
 export function getProviderById(id: string): ProviderTemplate | undefined {
   return providerTemplates.find((p) => p.id === id);
+}
+
+/**
+ * Materialize a complete `Profile` from a provider template and the
+ * credentials the user supplied. Single source of truth for the
+ * `provider.envTemplate + 5 ANTHROPIC_* keys` merge that every profile
+ * creation goes through.
+ *
+ * Why a function and not a method on `ProviderTemplate`: the literal
+ * template objects in `providerTemplates` are plain data, and adding
+ * a method would require either changing them to classes (large
+ * churn) or attaching the method at module load time (clever, but
+ * harder to test and to read). A free function is the smallest
+ * honest shape.
+ */
+export function materializeProfile(
+  provider: ProviderTemplate,
+  input: {
+    token: string;
+    baseUrl: string;
+    sonnetModel: string;
+    opusModel: string;
+    haikuModel: string;
+  },
+  profileName: string
+): Profile {
+  const env: EnvConfig = {
+    ...provider.envTemplate,
+    ANTHROPIC_BASE_URL: input.baseUrl,
+    ANTHROPIC_AUTH_TOKEN: input.token,
+    ANTHROPIC_MODEL: input.sonnetModel,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: input.sonnetModel,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: input.opusModel,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: input.haikuModel,
+  };
+
+  return {
+    name: profileName,
+    description: provider.name,
+    env,
+  };
 }

@@ -1,16 +1,15 @@
-import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envRenderer.js';
 import { RenameProfileInput, CommandResult } from '../types/command.js';
+import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
 import { ProfileAlreadyExistsError } from '../errors.js';
 
-export async function renameCommand(input: RenameProfileInput): Promise<CommandResult> {
+export async function renameCommand(ctx: CommandContext, input: RenameProfileInput): Promise<CommandResult> {
   return runCommand('重命名配置', async () => {
     // Get the old profile
-    const oldProfile = profileService.getProfile(input.oldName);
+    const oldProfile = ctx.profiles.getProfile(input.oldName);
 
     // Check if new name already exists
-    if (profileService.profileExists(input.newName)) {
+    if (ctx.profiles.profileExists(input.newName)) {
       throw new ProfileAlreadyExistsError(input.newName);
     }
 
@@ -22,45 +21,43 @@ export async function renameCommand(input: RenameProfileInput): Promise<CommandR
     };
 
     // Save new profile
-    profileService.saveProfile(newProfile);
+    ctx.profiles.saveProfile(newProfile);
 
     // If this was the current profile, update the reference
-    const currentProfile = profileService.getCurrentProfile();
+    const currentProfile = ctx.profiles.getCurrentProfile();
     if (currentProfile === input.oldName) {
-      profileService.setCurrentProfile(input.newName);
+      ctx.profiles.setCurrentProfile(input.newName);
     }
 
     // Delete old profile
-    profileService.deleteProfile(input.oldName);
+    ctx.profiles.deleteProfile(input.oldName);
 
-    return { success: true, output: envPresenter.formatRenameSuccess(input.oldName, input.newName) };
+    return { success: true, output: ctx.env.formatRenameSuccess(input.oldName, input.newName) };
   });
 }
 
-export async function renameCommandInteractive(): Promise<CommandResult> {
-  const { selectProfileFromList, confirmAction, promptForNewName } = await import('../ui/prompt.js');
-
-  const profiles = profileService.listProfiles();
+export async function renameCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
+  const profiles = ctx.profiles.listProfiles();
   if (profiles.length === 0) {
     return { success: false, error: '没有可重命名的配置。' };
   }
 
-  const currentProfile = profileService.getCurrentProfile();
-  const selectedName = await selectProfileFromList(profiles, currentProfile);
+  const currentProfile = ctx.profiles.getCurrentProfile();
+  const selectedName = await ctx.prompts.selectProfileFromList(profiles, currentProfile);
 
   if (!selectedName) {
     return { success: false, error: '已取消重命名。', wasCancelled: true };
   }
 
-  const newName = await promptForNewName(selectedName);
+  const newName = await ctx.prompts.promptForNewName(selectedName);
   if (!newName) {
     return { success: false, error: '已取消重命名。', wasCancelled: true };
   }
 
-  const confirmed = await confirmAction(`确定要将配置 '${selectedName}' 重命名为 '${newName}' 吗？`);
+  const confirmed = await ctx.prompts.confirmAction(`确定要将配置 '${selectedName}' 重命名为 '${newName}' 吗？`);
   if (!confirmed) {
     return { success: false, error: '已取消重命名。', wasCancelled: true };
   }
 
-  return renameCommand({ oldName: selectedName, newName });
+  return renameCommand(ctx, { oldName: selectedName, newName });
 }

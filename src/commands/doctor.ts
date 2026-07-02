@@ -1,11 +1,11 @@
 import { existsSync, statSync, readdirSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { profileService } from '../services/profileService.js';
 import { CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { isValidEnvKey } from '../utils/shellSafety.js';
 import { icon } from '../ui/theme.js';
+import type { CommandContext } from './context.js';
 
 interface CheckResult {
   name: string;
@@ -14,8 +14,8 @@ interface CheckResult {
   suggestion?: string;
 }
 
-function checkConfigDir(): CheckResult {
-  const storeLocation = profileService.getStoreLocation();
+function checkConfigDir(ctx: CommandContext): CheckResult {
+  const storeLocation = ctx.profiles.getStoreLocation();
   if (!storeLocation || !existsSync(storeLocation)) {
     return { name: '配置目录', status: 'error', message: '配置目录不存在', suggestion: '运行 claude-profile create 创建第一个配置' };
   }
@@ -31,8 +31,8 @@ function checkConfigDir(): CheckResult {
   return { name: '配置目录', status: 'ok', message: '存在且权限正确' };
 }
 
-function checkProfileFiles(): CheckResult {
-  const storeLocation = profileService.getStoreLocation();
+function checkProfileFiles(ctx: CommandContext): CheckResult {
+  const storeLocation = ctx.profiles.getStoreLocation();
   if (!storeLocation || !existsSync(storeLocation)) {
     return { name: '配置文件权限', status: 'ok', message: '无配置文件' };
   }
@@ -53,8 +53,8 @@ function checkProfileFiles(): CheckResult {
   }
 }
 
-function checkProfiles(): CheckResult {
-  const profiles = profileService.listProfiles();
+function checkProfiles(ctx: CommandContext): CheckResult {
+  const profiles = ctx.profiles.listProfiles();
   if (profiles.length === 0) {
     return { name: '配置数量', status: 'warning', message: '没有配置', suggestion: '运行 claude-profile create 创建配置' };
   }
@@ -75,12 +75,17 @@ function checkProfiles(): CheckResult {
   return { name: '配置安全', status: 'ok', message: `${profiles.length} 个配置通过检查` };
 }
 
-function checkCurrentProfile(): CheckResult {
-  const current = profileService.getCurrentProfile();
+function checkCurrentProfile(ctx: CommandContext): CheckResult {
+  const current = ctx.profiles.getCurrentProfile();
   if (!current) {
     return { name: '当前配置', status: 'warning', message: '未设置当前配置', suggestion: '运行 claude-profile switch <name> 激活配置' };
   }
-  const profile = profileService.getProfile(current);
+  let profile;
+  try {
+    profile = ctx.profiles.getProfile(current);
+  } catch {
+    return { name: '当前配置', status: 'error', message: `当前配置 '${current}' 不存在`, suggestion: '切换到一个有效的配置' };
+  }
   if (!profile) {
     return { name: '当前配置', status: 'error', message: `当前配置 '${current}' 不存在`, suggestion: '切换到一个有效的配置' };
   }
@@ -116,12 +121,17 @@ function checkGitRepo(): CheckResult {
   }
 }
 
-function checkEnvConsistency(): CheckResult {
-  const current = profileService.getCurrentProfile();
+function checkEnvConsistency(ctx: CommandContext): CheckResult {
+  const current = ctx.profiles.getCurrentProfile();
   if (!current) {
     return { name: '环境一致性', status: 'ok', message: '无当前配置' };
   }
-  const profile = profileService.getProfile(current);
+  let profile;
+  try {
+    profile = ctx.profiles.getProfile(current);
+  } catch {
+    return { name: '环境一致性', status: 'ok', message: '当前配置不存在' };
+  }
   if (!profile) {
     return { name: '环境一致性', status: 'ok', message: '当前配置不存在' };
   }
@@ -137,16 +147,16 @@ function checkEnvConsistency(): CheckResult {
   return { name: '环境一致性', status: 'ok', message: '所有变量与当前 shell 一致' };
 }
 
-export async function doctorCommand(): Promise<CommandResult> {
+export async function doctorCommand(ctx: CommandContext): Promise<CommandResult> {
   return runCommand('诊断检查', async () => {
     const checks = [
-      checkConfigDir(),
-      checkProfileFiles(),
-      checkProfiles(),
-      checkCurrentProfile(),
+      checkConfigDir(ctx),
+      checkProfileFiles(ctx),
+      checkProfiles(ctx),
+      checkCurrentProfile(ctx),
       checkHook(),
       checkGitRepo(),
-      checkEnvConsistency(),
+      checkEnvConsistency(ctx),
     ];
 
     const errors = checks.filter(c => c.status === 'error');

@@ -1,13 +1,13 @@
-import { profileService } from '../services/profileService.js';
 import { CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { maskValue } from '../utils/sensitiveKeys.js';
+import type { CommandContext } from './context.js';
 
-export async function statusCommand(): Promise<CommandResult> {
+export async function statusCommand(ctx: CommandContext): Promise<CommandResult> {
   return runCommand('状态查询', async () => {
-    const currentProfile = profileService.getCurrentProfile();
-    const storeLocation = profileService.getStoreLocation();
-    const profiles = profileService.listProfiles();
+    const currentProfile = ctx.profiles.getCurrentProfile();
+    const storeLocation = ctx.profiles.getStoreLocation();
+    const profiles = ctx.profiles.listProfiles();
 
     const lines: string[] = [];
     lines.push('');

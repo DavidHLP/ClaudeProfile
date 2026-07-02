@@ -28,6 +28,7 @@ export interface EnvPresenter {
   formatBackupList(backups: { name: string; path: string; date: Date }[]): string;
   formatError(message: string): string;
   formatWarning(message: string): string;
+  formatProfileDetail(profile: Profile, isCurrent: boolean): string;
   formatNoProfiles(): string;
   formatCancel(message: string): string;
 }
@@ -170,6 +171,25 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
 
   formatWarning(message: string): string {
     return `${theme.warning('警告:')} ${message}`;
+  }
+
+  formatProfileDetail(profile: Profile, isCurrent: boolean): string {
+    const marker = isCurrent ? icon.active : icon.standby;
+    const nameLine = `  ${marker} ${isCurrent ? theme.bold(profile.name) : profile.name} (${profile.description || '无描述'})`;
+    const env = profile.env;
+    const rows: Array<[string, string]> = [
+      ['BASE URL', env.ANTHROPIC_BASE_URL || '未设置'],
+      ['TOKEN', env.ANTHROPIC_AUTH_TOKEN ? '已设置' : '未设置'],
+      ['MODEL', env.ANTHROPIC_MODEL || '未设置'],
+      ['SONNET', env.ANTHROPIC_DEFAULT_SONNET_MODEL || '未设置'],
+      ['OPUS', env.ANTHROPIC_DEFAULT_OPUS_MODEL || '未设置'],
+      ['HAIKU', env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '未设置'],
+    ];
+    const lines: string[] = [nameLine];
+    for (const [label, value] of rows) {
+      lines.push(`    ${theme.dim(label + ':')} ${value}`);
+    }
+    return lines.join('\n');
   }
 
   formatNoProfiles(): string {

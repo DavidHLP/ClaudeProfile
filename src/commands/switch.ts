@@ -1,16 +1,15 @@
-import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envRenderer.js';
 import { buildSwitchCommands } from '../engine/envDiff.js';
 import { SwitchProfileInput, CommandResult } from '../types/command.js';
-import { runCommand } from './runner.js';
 import { resolveOldEnv } from '../engine/activation.js';
+import type { CommandContext } from './context.js';
+import { runCommand } from './runner.js';
 
-export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = process.stdout.isTTY): Promise<CommandResult> {
+export async function switchCommand(ctx: CommandContext, input: SwitchProfileInput): Promise<CommandResult> {
   return runCommand('切换配置', async () => {
-    const currentProfileName = profileService.getCurrentProfile();
-    const oldEnv = resolveOldEnv(profileService, currentProfileName, input.profileName);
+    const currentProfileName = ctx.profiles.getCurrentProfile();
+    const oldEnv = resolveOldEnv(ctx.profiles, currentProfileName, input.profileName);
 
-    const profile = profileService.getProfile(input.profileName);
+    const profile = ctx.profiles.getProfile(input.profileName);
 
     if (input.dryRun) {
       return {
@@ -19,46 +18,42 @@ export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = 
       };
     }
 
-    profileService.setCurrentProfile(input.profileName);
+    ctx.profiles.setCurrentProfile(input.profileName);
 
-    // 只通过 eval bridge 注入当前 shell（输出 export/unset 命令），
-    // 不再写入 ~/.claude/settings.json。
-    // 交互终端输出 banner；被 `eval "$(claude-profile switch xxx)"` 捕获时（非 TTY）
-    // 输出纯 export/unset 命令，由 shell hook 的 safe_eval 注入。
-    const output = isTTY
-      ? envPresenter.formatSwitchSuccess(input.profileName, profile.env)
+    // TTY → banner; non-TTY → pure `export`/`unset` lines for the
+    // shell-hook's safe-eval bridge to inject into the current shell.
+    const output = ctx.isTTY
+      ? ctx.env.formatSwitchSuccess(input.profileName, profile.env)
       : buildSwitchCommands(oldEnv, profile.env);
 
     return { success: true, output };
   });
 }
 
-export async function switchCommandInteractive(): Promise<CommandResult> {
-  const { selectProfileFromList } = await import('../ui/prompt.js');
-
-  const profiles = profileService.listProfiles();
+export async function switchCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
+  const profiles = ctx.profiles.listProfiles();
   if (profiles.length === 0) {
     return { success: false, error: '没有可用的配置。请先使用 create 命令创建配置。' };
   }
 
-  const currentProfile = profileService.getCurrentProfile();
+  const currentProfile = ctx.profiles.getCurrentProfile();
 
   // 输出 banner
-  console.log(envPresenter.formatBanner());
+  console.log(ctx.env.formatBanner());
 
   // 如果只有一个配置且已是当前配置，无需操作
   if (profiles.length === 1 && profiles[0].name === currentProfile) {
-    return switchCommand({ profileName: currentProfile });
+    return switchCommand(ctx, { profileName: currentProfile! });
   }
 
-  const selectedName = await selectProfileFromList(profiles, currentProfile);
+  const selectedName = await ctx.prompts.selectProfileFromList(profiles, currentProfile);
 
   if (!selectedName) {
     return { success: false, error: '已取消切换。', wasCancelled: true };
   }
 
   // Save old profile name for diff in export --current
-  profileService.setPreviousProfile(currentProfile);
+  ctx.profiles.setPreviousProfile(currentProfile);
 
-  return switchCommand({ profileName: selectedName });
+  return switchCommand(ctx, { profileName: selectedName });
 }

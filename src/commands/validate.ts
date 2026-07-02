@@ -1,6 +1,6 @@
-import { profileService } from '../services/profileService.js';
 import { CommandResult } from '../types/command.js';
 import { Profile } from '../types/index.js';
+import type { CommandContext } from './context.js';
 
 export interface ValidateOptions {
   verbose?: boolean;
@@ -95,9 +95,9 @@ function validateProfile(profile: Profile, _isCurrentProfile: boolean): Validati
   return issues;
 }
 
-export async function validateCommand(options: ValidateOptions = {}): Promise<CommandResult> {
-  const profiles = profileService.listProfiles();
-  const currentProfile = profileService.getCurrentProfile();
+export async function validateCommand(ctx: CommandContext, options: ValidateOptions = {}): Promise<CommandResult> {
+  const profiles = ctx.profiles.listProfiles();
+  const currentProfile = ctx.profiles.getCurrentProfile();
   const allIssues: ValidationIssue[] = [];
 
   if (profiles.length === 0) {
@@ -120,25 +120,20 @@ export async function validateCommand(options: ValidateOptions = {}): Promise<Co
 
   if (errors.length === 0 && warnings.length === 0) {
     if (options.verbose) {
-      const detailLines: string[] = [];
-      detailLines.push(`\n详细信息:`);
-      detailLines.push(`  配置目录: ${profileService.getStoreLocation() || '未知'}`);
-      detailLines.push(`  当前配置: ${currentProfile || '无'}`);
-      detailLines.push(`  配置数量: ${profiles.length}`);
-
-      for (const profile of profiles) {
-        const isCurrent = profile.name === currentProfile;
-        detailLines.push(`\n  ${isCurrent ? '→ ' : '  '}${profile.name} (${profile.description || '无描述'}):`);
-        detailLines.push(`    BASE URL: ${profile.env.ANTHROPIC_BASE_URL || '❌ 未设置'}`);
-        detailLines.push(`    TOKEN: ${profile.env.ANTHROPIC_AUTH_TOKEN ? '✓ 已设置' : '❌ 未设置'}`);
-        detailLines.push(`    MODEL: ${profile.env.ANTHROPIC_MODEL || '⚠️ 未设置'}`);
-        detailLines.push(`    SONNET: ${profile.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '⚠️ 未设置'}`);
-        detailLines.push(`    OPUS: ${profile.env.ANTHROPIC_DEFAULT_OPUS_MODEL || '⚠️ 未设置'}`);
-        detailLines.push(`    HAIKU: ${profile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '⚠️ 未设置'}`);
-      }
+      // Reuse the shared per-profile detail renderer so list/validate
+      // never drift apart.
+      const detailBlocks = profiles.map((profile) =>
+        ctx.env.formatProfileDetail(profile, profile.name === currentProfile)
+      );
+      const header = [
+        `\n详细信息:`,
+        `  配置目录: ${ctx.profiles.getStoreLocation() || '未知'}`,
+        `  当前配置: ${currentProfile || '无'}`,
+        `  配置数量: ${profiles.length}`,
+      ];
       return {
         success: true,
-        output: `验证通过：${profiles.length} 个配置检查无误${detailLines.join('\n')}`,
+        output: `验证通过：${profiles.length} 个配置检查无误\n${header.join('\n')}\n\n${detailBlocks.join('\n\n')}`,
       };
     }
     return {
@@ -162,21 +157,17 @@ export async function validateCommand(options: ValidateOptions = {}): Promise<Co
   }
 
   if (options.verbose) {
+    // Even on failure, surface the per-profile detail so users can
+    // see what each profile actually contains.
+    const detailBlocks = profiles.map((profile) =>
+      ctx.env.formatProfileDetail(profile, profile.name === currentProfile)
+    );
     lines.push('\n详细信息:');
-    lines.push(`  配置目录: ${profileService.getStoreLocation() || '未知'}`);
+    lines.push(`  配置目录: ${ctx.profiles.getStoreLocation() || '未知'}`);
     lines.push(`  当前配置: ${currentProfile || '无'}`);
     lines.push(`  配置数量: ${profiles.length}`);
-
-    for (const profile of profiles) {
-      const isCurrent = profile.name === currentProfile;
-      lines.push(`\n  ${isCurrent ? '→ ' : '  '}${profile.name} (${profile.description || '无描述'}):`);
-      lines.push(`    BASE URL: ${profile.env.ANTHROPIC_BASE_URL || '❌ 未设置'}`);
-      lines.push(`    TOKEN: ${profile.env.ANTHROPIC_AUTH_TOKEN ? '✓ 已设置' : '❌ 未设置'}`);
-      lines.push(`    MODEL: ${profile.env.ANTHROPIC_MODEL || '⚠️ 未设置'}`);
-      lines.push(`    SONNET: ${profile.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '⚠️ 未设置'}`);
-      lines.push(`    OPUS: ${profile.env.ANTHROPIC_DEFAULT_OPUS_MODEL || '⚠️ 未设置'}`);
-      lines.push(`    HAIKU: ${profile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '⚠️ 未设置'}`);
-    }
+    lines.push('');
+    lines.push(...detailBlocks);
   }
 
   const output = lines.join('\n');

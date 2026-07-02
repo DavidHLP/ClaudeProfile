@@ -2,11 +2,10 @@ import * as tar from 'tar';
 import type { Stats } from 'fs';
 import { mkdirSync, existsSync, readdirSync, statSync } from 'fs';
 import { dirname } from 'path';
-import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envRenderer.js';
 import { BackupConfigInput, RestoreConfigInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { FileOperationError, AppError } from '../errors.js';
+import type { CommandContext } from './context.js';
 
 const BACKUP_DIR = '.claude-profile-backups';
 
@@ -81,9 +80,9 @@ async function extractTarGz(sourcePath: string, targetDir: string): Promise<void
   });
 }
 
-export async function backupCommand(input: BackupConfigInput): Promise<CommandResult> {
+export async function backupCommand(ctx: CommandContext, input: BackupConfigInput): Promise<CommandResult> {
   return runCommand('备份配置', async () => {
-    const storeLocation = profileService.getStoreLocation();
+    const storeLocation = ctx.profiles.getStoreLocation();
     if (!storeLocation) {
       throw new AppError('无法获取配置目录位置', 'CONFIG_DIR_NOT_FOUND');
     }
@@ -107,7 +106,7 @@ export async function backupCommand(input: BackupConfigInput): Promise<CommandRe
       throw new FileOperationError('create backup', backupPath, err);
     }
 
-    return { success: true, output: envPresenter.formatBackupSuccess(backupPath) };
+    return { success: true, output: ctx.env.formatBackupSuccess(backupPath) };
   });
 }
 
@@ -138,7 +137,7 @@ function listBackups(): { name: string; path: string; date: Date }[] {
   }
 }
 
-export async function restoreCommand(input: RestoreConfigInput): Promise<CommandResult> {
+export async function restoreCommand(ctx: CommandContext, input: RestoreConfigInput): Promise<CommandResult> {
   return runCommand('恢复配置', async () => {
     if (input.backupPath) {
       // Restore from specific backup
@@ -146,7 +145,7 @@ export async function restoreCommand(input: RestoreConfigInput): Promise<Command
         throw new FileOperationError('read backup', input.backupPath, new Error('File not found'));
       }
 
-      const storeLocation = profileService.getStoreLocation();
+      const storeLocation = ctx.profiles.getStoreLocation();
       if (!storeLocation) {
         throw new AppError('无法获取配置目录位置', 'CONFIG_DIR_NOT_FOUND');
       }
@@ -157,7 +156,7 @@ export async function restoreCommand(input: RestoreConfigInput): Promise<Command
         throw new FileOperationError('restore from backup', input.backupPath, err);
       }
 
-      return { success: true, output: envPresenter.formatRestoreSuccess(input.backupPath) };
+      return { success: true, output: ctx.env.formatRestoreSuccess(input.backupPath) };
     }
 
     // List available backups for interactive selection
@@ -169,14 +168,14 @@ export async function restoreCommand(input: RestoreConfigInput): Promise<Command
     // Return list of backups for interactive selection
     return {
       success: true,
-      output: envPresenter.formatBackupList(backups),
+      output: ctx.env.formatBackupList(backups),
     };
   });
 }
 
-export async function restoreCommandInteractive(backupPath?: string): Promise<CommandResult> {
+export async function restoreCommandInteractive(ctx: CommandContext, backupPath?: string): Promise<CommandResult> {
   if (backupPath) {
-    return restoreCommand({ backupPath });
+    return restoreCommand(ctx, { backupPath });
   }
 
   const backups = listBackups();
@@ -184,12 +183,11 @@ export async function restoreCommandInteractive(backupPath?: string): Promise<Co
     return { success: false, error: '没有可用的备份' };
   }
 
-  const { selectBackup } = await import('../ui/prompt.js');
-  const selected = await selectBackup(backups);
+  const selected = await ctx.prompts.selectBackup(backups);
 
   if (!selected) {
     return { success: false, error: '已取消恢复。', wasCancelled: true };
   }
 
-  return restoreCommand({ backupPath: selected });
+  return restoreCommand(ctx, { backupPath: selected });
 }

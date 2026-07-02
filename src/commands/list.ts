@@ -1,46 +1,43 @@
-import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envRenderer.js';
 import { CommandResult } from '../types/command.js';
+import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
 
 export interface ListOptions {
   verbose?: boolean;
 }
 
-export async function listCommand(options: ListOptions = {}): Promise<CommandResult> {
+export async function listCommand(ctx: CommandContext, options: ListOptions = {}): Promise<CommandResult> {
   return runCommand('列出配置', async () => {
-    const profiles = profileService.listProfiles();
-    const currentProfile = profileService.getCurrentProfile();
+    const profiles = ctx.profiles.listProfiles();
+    const currentProfile = ctx.profiles.getCurrentProfile();
 
     if (profiles.length === 0) {
-      return { success: true, output: envPresenter.formatNoProfiles() };
+      return { success: true, output: ctx.env.formatNoProfiles() };
     }
 
-    const baseOutput = envPresenter.formatProfileList(profiles, currentProfile);
+    const baseOutput = ctx.env.formatProfileList(profiles, currentProfile);
 
     if (!options.verbose) {
       return { success: true, output: baseOutput };
     }
 
-    // Verbose mode: add detailed information
-    const verboseLines: string[] = [baseOutput, ''];
-    verboseLines.push('详细信息:');
-    verboseLines.push(`  配置目录: ${profileService.getStoreLocation() || '未知'}`);
-    verboseLines.push(`  当前配置: ${currentProfile || '无'}`);
-    verboseLines.push(`  配置数量: ${profiles.length}`);
+    // Verbose mode: per-profile detail via the shared presenter so
+    // list/validate stay in lock-step without duplicating field order.
+    const detailBlocks = profiles.map((profile) =>
+      ctx.env.formatProfileDetail(profile, profile.name === currentProfile)
+    );
 
-    for (const profile of profiles) {
-      const isCurrent = profile.name === currentProfile;
-      verboseLines.push('');
-      verboseLines.push(`  ${isCurrent ? '→ ' : '  '}${profile.name} (${profile.description || '无描述'}):`);
-      verboseLines.push(`    BASE URL: ${profile.env.ANTHROPIC_BASE_URL || '未设置'}`);
-      verboseLines.push(`    TOKEN: ${profile.env.ANTHROPIC_AUTH_TOKEN ? '已设置' : '未设置'}`);
-      verboseLines.push(`    MODEL: ${profile.env.ANTHROPIC_MODEL || '未设置'}`);
-      verboseLines.push(`    SONNET: ${profile.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '未设置'}`);
-      verboseLines.push(`    OPUS: ${profile.env.ANTHROPIC_DEFAULT_OPUS_MODEL || '未设置'}`);
-      verboseLines.push(`    HAIKU: ${profile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '未设置'}`);
-    }
+    const header = [
+      '',
+      '详细信息:',
+      `  配置目录: ${ctx.profiles.getStoreLocation() || '未知'}`,
+      `  当前配置: ${currentProfile || '无'}`,
+      `  配置数量: ${profiles.length}`,
+    ];
 
-    return { success: true, output: verboseLines.join('\n') };
+    return {
+      success: true,
+      output: [baseOutput, '', ...header, '', ...detailBlocks].join('\n'),
+    };
   });
 }

@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+/**
+ * `claude-profile` CLI entrypoint.
+ *
+ * Constructs a single `CommandContext` (profiles + env presenter + prompts +
+ * TTY flag) and threads it through every command. Tests construct their own
+ * contexts in-process and never reach the bin; production constructs the
+ * default context here exactly once per invocation.
+ */
 import { createCommandInteractive } from '../dist/commands/create.js';
 import { editCommandInteractive } from '../dist/commands/edit.js';
 import { deleteCommand, deleteCommandInteractive } from '../dist/commands/delete.js';
@@ -16,6 +24,11 @@ import { completionCommand } from '../dist/commands/completion.js';
 import { runProfileCommand, execProfileCommand } from '../dist/commands/run.js';
 import { doctorCommand } from '../dist/commands/doctor.js';
 import { statusCommand } from '../dist/commands/status.js';
+import { createDefaultContext } from '../dist/commands/context.js';
+
+// Build the context once. process.stdout.isTTY drives the TTY-aware
+// branches in switch/export.
+const ctx = createDefaultContext();
 
 let result;
 const args = process.argv.slice(2);
@@ -32,40 +45,40 @@ const globalOptions = {
 async function main() {
   switch (command) {
     case 'create':
-      result = await createCommandInteractive();
+      result = await createCommandInteractive(ctx);
       break;
 
     case 'switch':
       if (args.length === 1) {
-        result = await switchCommandInteractive();
+        result = await switchCommandInteractive(ctx);
       } else {
         const profileName = args[1];
         const dryRun = args.includes('--dry-run');
-        result = await switchCommand({ profileName, dryRun });
+        result = await switchCommand(ctx, { profileName, dryRun });
       }
       break;
 
     case 'list':
-      result = await listCommand({ verbose: globalOptions.verbose });
+      result = await listCommand(ctx, { verbose: globalOptions.verbose });
       break;
 
     case 'edit':
-      result = await editCommandInteractive();
+      result = await editCommandInteractive(ctx);
       break;
 
     case 'delete':
       if (args[1] && !args[1].startsWith('-')) {
-        result = await deleteCommand({ profileName: args[1], yes: globalOptions.yes });
+        result = await deleteCommand(ctx, { profileName: args[1], yes: globalOptions.yes });
       } else {
-        result = await deleteCommandInteractive();
+        result = await deleteCommandInteractive(ctx);
       }
       break;
 
     case 'rename':
       if (args.length >= 3) {
-        result = await renameCommand({ oldName: args[1], newName: args[2] });
+        result = await renameCommand(ctx, { oldName: args[1], newName: args[2] });
       } else if (args.length === 2) {
-        result = await renameCommandInteractive();
+        result = await renameCommandInteractive(ctx);
       } else {
         result = { success: false, error: '用法: claude-profile rename <旧名称> <新名称>' };
       }
@@ -73,9 +86,9 @@ async function main() {
 
     case 'duplicate':
       if (args.length >= 3) {
-        result = await duplicateCommand({ sourceName: args[1], newName: args[2] });
+        result = await duplicateCommand(ctx, { sourceName: args[1], newName: args[2] });
       } else if (args.length === 2) {
-        result = await duplicateCommandInteractive();
+        result = await duplicateCommandInteractive(ctx);
       } else {
         result = { success: false, error: '用法: claude-profile duplicate <源名称> <新名称>' };
       }
@@ -85,16 +98,16 @@ async function main() {
       if (args.includes('--current') && args.includes('--file')) {
         const format = args.includes('--yaml') ? 'yaml' : 'json';
         const outputPath = getArgValue(args, '--output');
-        result = await exportCurrentFileCommand({ format, outputPath });
+        result = await exportCurrentFileCommand(ctx, { format, outputPath });
       } else if (args.includes('--file')) {
         const format = args.includes('--yaml') ? 'yaml' : 'json';
         const outputPath = getArgValue(args, '--output');
         const profileName = args[1];
-        result = await exportFileCommand({ profileName, format, outputPath });
+        result = await exportFileCommand(ctx, { profileName, format, outputPath });
       } else if (args.includes('--current')) {
-        result = await exportCurrentCommand({ json: globalOptions.json });
+        result = await exportCurrentCommand(ctx, { json: globalOptions.json });
       } else {
-        result = await exportCommand({ profileName: args[1], json: globalOptions.json });
+        result = await exportCommand(ctx, { profileName: args[1], json: globalOptions.json });
       }
       break;
 
@@ -103,9 +116,9 @@ async function main() {
         const format = args.includes('--yaml') ? 'yaml' : 'json';
         const profileName = getArgValue(args, '--name');
         const force = args.includes('--force');
-        result = await importFileCommand({ inputPath: args[1], format, profileName, force });
+        result = await importFileCommand(ctx, { inputPath: args[1], format, profileName, force });
       } else {
-        result = await importFileCommandInteractive();
+        result = await importFileCommandInteractive(ctx);
       }
       break;
 
@@ -114,21 +127,21 @@ async function main() {
         const restoreIndex = args.indexOf('--restore');
         const backupPath = args[restoreIndex + 1];
         if (backupPath && !backupPath.startsWith('-')) {
-          result = await restoreCommand({ backupPath });
+          result = await restoreCommand(ctx, { backupPath });
         } else {
-          result = await restoreCommandInteractive();
+          result = await restoreCommandInteractive(ctx);
         }
       } else {
         const outputPath = args[1];
-        result = await backupCommand({ outputPath });
+        result = await backupCommand(ctx, { outputPath });
       }
       break;
 
     case 'restore':
       if (args[1]) {
-        result = await restoreCommand({ backupPath: args[1] });
+        result = await restoreCommand(ctx, { backupPath: args[1] });
       } else {
-        result = await restoreCommandInteractive();
+        result = await restoreCommandInteractive(ctx);
       }
       break;
 
@@ -137,7 +150,7 @@ async function main() {
       break;
 
     case 'validate':
-      result = await validateCommand({ verbose: globalOptions.verbose });
+      result = await validateCommand(ctx, { verbose: globalOptions.verbose });
       break;
 
     case 'completion':
@@ -156,17 +169,17 @@ async function main() {
         result = { success: false, error: '用法: claude-profile run <配置名> -- <命令...>' };
       } else {
         const cmd = command === 'run' ? runProfileCommand : execProfileCommand;
-        result = await cmd({ profileName, command: cmdArgs, noInheritEnv, printEnv });
+        result = await cmd(ctx, { profileName, command: cmdArgs, noInheritEnv, printEnv });
       }
       break;
     }
 
     case 'doctor':
-      result = await doctorCommand();
+      result = await doctorCommand(ctx);
       break;
 
     case 'status':
-      result = await statusCommand();
+      result = await statusCommand(ctx);
       break;
 
     case '--help':

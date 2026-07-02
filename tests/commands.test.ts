@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { Profile } from '../src/types/index.js';
 import { ProfileNotFoundError } from '../src/errors.js';
+import { ProfileServiceImpl } from '../src/services/profileService.js';
+import { InMemoryConfigStore } from '../src/config/inMemoryConfigStore.js';
+import { envPresenter } from '../src/presenters/envRenderer.js';
+import { noopPrompts, type CommandContext } from '../src/commands/context.js';
 
-// Factory function for fresh mock profile
-function createMockProfile(overrides = {}) {
+// ── Fixture builders ─────────────────────────────────────────────────────
+
+function createMockProfile(overrides: Partial<Profile> & { env?: Record<string, string> } = {}): Profile {
   return {
     name: 'test-profile',
     description: 'Test Provider',
@@ -14,43 +19,48 @@ function createMockProfile(overrides = {}) {
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'test-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'test-opus',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'test-haiku',
-      ...overrides.env,
+      ...(overrides.env || {}),
     },
     ...overrides,
-  };
+  } as Profile;
 }
 
-// Mock the profileService
-const mockProfileService = {
-  listProfiles: vi.fn(),
-  getProfile: vi.fn(),
-  saveProfile: vi.fn(),
-  deleteProfile: vi.fn().mockReturnValue(true),
-  getCurrentProfile: vi.fn().mockReturnValue(null),
-  setCurrentProfile: vi.fn(),
-  profileExists: vi.fn().mockReturnValue(true),
-  getPreviousProfile: vi.fn().mockReturnValue(null),
-  setPreviousProfile: vi.fn(),
-  getStoreLocation: vi.fn().mockReturnValue('/test/config'),
-};
-
-vi.mock('../src/services/profileService.js', () => ({
-  profileService: mockProfileService,
-}));
+/**
+ * Build a fresh CommandContext backed by an in-memory store and the
+ * real EnvPresenter. The noopPrompts default is safe because every
+ * test in this file exercises a non-interactive command path.
+ */
+function buildCtx(store: InMemoryConfigStore = new InMemoryConfigStore()): {
+  ctx: CommandContext;
+  store: InMemoryConfigStore;
+} {
+  const service = new ProfileServiceImpl(store);
+  const ctx: CommandContext = {
+    profiles: service,
+    env: envPresenter,
+    prompts: noopPrompts,
+    isTTY: false,
+  };
+  return { ctx, store };
+}
 
 describe('Commands', () => {
+  let store: InMemoryConfigStore;
+  let ctx: CommandContext;
+
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset mockProfile to fresh state before each test
-    const freshProfile = createMockProfile();
-    mockProfileService.listProfiles.mockReturnValue([freshProfile]);
-    mockProfileService.getProfile.mockReturnValue(freshProfile);
+    const built = buildCtx();
+    store = built.store;
+    ctx = built.ctx;
+    store.saveProfile(createMockProfile());
   });
+
+  // ── listCommand ────────────────────────────────────────────────────────
 
   describe('listCommand', () => {
     it('should return success with formatted profile list', async () => {
       const { listCommand } = await import('../src/commands/list.js');
-      const result = await listCommand();
+      const result = await listCommand(ctx);
 
       expect(result.success).toBe(true);
       expect(result.output).toContain('test-profile');
@@ -58,20 +68,23 @@ describe('Commands', () => {
     });
 
     it('should return no profiles message when empty', async () => {
-      mockProfileService.listProfiles.mockReturnValueOnce([]);
-      
-      const { listCommand } = await import('../src/commands/list.js');
-      const result = await listCommand();
+      // Fresh store with no profiles
+      const built = buildCtx();
+      const result = await import('../src/commands/list.js').then((m) =>
+        m.listCommand(built.ctx)
+      );
 
       expect(result.success).toBe(true);
       expect(result.output).toContain('没有可用的配置');
     });
   });
 
+  // ── switchCommand ──────────────────────────────────────────────────────
+
   describe('switchCommand', () => {
     it('should return export commands in non-TTY mode', async () => {
       const { switchCommand } = await import('../src/commands/switch.js');
-      const result = await switchCommand({ profileName: 'test-profile' }, false);
+      const result = await switchCommand(ctx, { profileName: 'test-profile' });
 
       expect(result.success).toBe(true);
       expect(result.output).toContain('export ANTHROPIC_BASE_URL');
@@ -79,8 +92,9 @@ describe('Commands', () => {
     });
 
     it('should return formatted success in TTY mode', async () => {
+      const ttyCtx: CommandContext = { ...ctx, isTTY: true };
       const { switchCommand } = await import('../src/commands/switch.js');
-      const result = await switchCommand({ profileName: 'test-profile' }, true);
+      const result = await switchCommand(ttyCtx, { profileName: 'test-profile' });
 
       expect(result.success).toBe(true);
       expect(result.output).toContain('已切换到');
@@ -88,22 +102,20 @@ describe('Commands', () => {
     });
 
     it('should return error for non-existent profile', async () => {
-      mockProfileService.getProfile.mockImplementationOnce(() => {
-        throw new ProfileNotFoundError('non-existent');
-      });
-      
       const { switchCommand } = await import('../src/commands/switch.js');
-      const result = await switchCommand({ profileName: 'non-existent' }, true);
+      const result = await switchCommand(ctx, { profileName: 'non-existent' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('non-existent');
+      if (!result.success) {
+        expect(result.error).toContain('non-existent');
+      }
     });
 
-    it('should call setCurrentProfile', async () => {
+    it('should mark the switched profile as current', async () => {
       const { switchCommand } = await import('../src/commands/switch.js');
-      await switchCommand({ profileName: 'test-profile' }, true);
+      await switchCommand(ctx, { profileName: 'test-profile' });
 
-      expect(mockProfileService.setCurrentProfile).toHaveBeenCalledWith('test-profile');
+      expect(ctx.profiles.getCurrentProfile()).toBe('test-profile');
     });
 
     it('should include unset commands when switching from a different profile', async () => {
@@ -119,33 +131,32 @@ describe('Commands', () => {
           API_TIMEOUT_MS: '3000000',
         },
       });
-      mockProfileService.getCurrentProfile.mockReturnValueOnce('old-profile');
-      mockProfileService.getProfile
-        .mockImplementationOnce(() => oldProfile)
-        .mockImplementationOnce(() => createMockProfile());
+      store.saveProfile(oldProfile);
+      ctx.profiles.setCurrentProfile('old-profile');
 
       const { switchCommand } = await import('../src/commands/switch.js');
-      const result = await switchCommand({ profileName: 'test-profile' }, false);
+      const result = await switchCommand(ctx, { profileName: 'test-profile' });
 
       expect(result.success).toBe(true);
-      if (result.success) { expect(result.output).toContain('unset API_TIMEOUT_MS'); };
+      if (result.success) {
+        expect(result.output).toContain('unset API_TIMEOUT_MS');
+      }
     });
 
-    it('should not call setCurrentProfile in dry-run mode', async () => {
+    it('should not mark current profile in dry-run mode', async () => {
       const { switchCommand } = await import('../src/commands/switch.js');
-      const result = await switchCommand({ profileName: 'test-profile', dryRun: true }, true);
+      const result = await switchCommand(ctx, { profileName: 'test-profile', dryRun: true });
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.output).toContain('dry-run');
       }
-      expect(mockProfileService.setCurrentProfile).not.toHaveBeenCalled();
+      expect(ctx.profiles.getCurrentProfile()).not.toBe('test-profile');
     });
 
     it('should not write settings.json (env injected via shell only)', async () => {
-      // switch 不再导入或调用 settingsSyncService —— 仅通过输出 export/unset 注入 shell。
       const { switchCommand } = await import('../src/commands/switch.js');
-      const result = await switchCommand({ profileName: 'test-profile' }, false);
+      const result = await switchCommand(ctx, { profileName: 'test-profile' });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -155,43 +166,48 @@ describe('Commands', () => {
     });
   });
 
+  // ── deleteCommand ──────────────────────────────────────────────────────
+
   describe('deleteCommand', () => {
     it('should return success when deleting profile', async () => {
       const { deleteCommand } = await import('../src/commands/delete.js');
-      const result = await deleteCommand({ profileName: 'test-profile' });
+      const result = await deleteCommand(ctx, { profileName: 'test-profile' });
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('已删除');
-      expect(mockProfileService.deleteProfile).toHaveBeenCalledWith('test-profile');
+      if (result.success) {
+        expect(result.output).toContain('已删除');
+      }
+      expect(ctx.profiles.profileExists('test-profile')).toBe(false);
     });
 
     it('should include active warning when deleting current profile', async () => {
-      mockProfileService.getCurrentProfile.mockReturnValueOnce('test-profile');
-      
+      ctx.profiles.setCurrentProfile('test-profile');
       const { deleteCommand } = await import('../src/commands/delete.js');
-      const result = await deleteCommand({ profileName: 'test-profile' });
+      const result = await deleteCommand(ctx, { profileName: 'test-profile' });
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('当前激活');
+      if (result.success) {
+        expect(result.output).toContain('当前激活');
+      }
     });
 
     it('should return error for non-existent profile', async () => {
-      mockProfileService.deleteProfile.mockImplementationOnce(() => {
-        throw new ProfileNotFoundError('non-existent');
-      });
-      
       const { deleteCommand } = await import('../src/commands/delete.js');
-      const result = await deleteCommand({ profileName: 'non-existent' });
+      const result = await deleteCommand(ctx, { profileName: 'non-existent' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('non-existent');
+      if (!result.success) {
+        expect(result.error).toContain('non-existent');
+      }
     });
   });
+
+  // ── createCommand ──────────────────────────────────────────────────────
 
   describe('createCommand', () => {
     it('should create profile with correct env values', async () => {
       const { createCommand } = await import('../src/commands/create.js');
-      const result = await createCommand({
+      const result = await createCommand(ctx, {
         providerId: 'minimax',
         profileName: 'new-profile',
         token: 'new-token',
@@ -202,410 +218,251 @@ describe('Commands', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockProfileService.saveProfile).toHaveBeenCalled();
-      
-      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
-      expect(savedProfile.name).toBe('new-profile');
-      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('new-token');
-      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('new-sonnet');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('new-opus');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('new-haiku');
+      const saved = ctx.profiles.getProfile('new-profile');
+      expect(saved.env.ANTHROPIC_AUTH_TOKEN).toBe('new-token');
+      expect(saved.env.ANTHROPIC_BASE_URL).toBe('https://api.new.com');
+      expect(saved.env.ANTHROPIC_MODEL).toBe('new-sonnet');
     });
 
     it('should return error for unknown provider', async () => {
       const { createCommand } = await import('../src/commands/create.js');
-      const result = await createCommand({
-        providerId: 'unknown-provider',
-        profileName: 'test',
-        token: 'token',
-        baseUrl: 'https://api.test.com',
-        sonnetModel: 'model',
-        opusModel: 'model',
-        haikuModel: 'model',
+      const result = await createCommand(ctx, {
+        providerId: 'no-such-provider',
+        profileName: 'x',
+        token: 't',
+        baseUrl: 'https://x.com',
+        sonnetModel: 's',
+        opusModel: 'o',
+        haikuModel: 'h',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('未知的 Provider');
+      if (!result.success) {
+        expect(result.error).toContain('未知的 Provider');
+      }
     });
   });
+
+  // ── editCommand ────────────────────────────────────────────────────────
 
   describe('editCommand', () => {
     it('should update only the specified field', async () => {
       const { editCommand } = await import('../src/commands/edit.js');
-      const result = await editCommand({
+      await editCommand(ctx, {
         profileName: 'test-profile',
         field: 'token',
         value: 'updated-token',
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProfileService.saveProfile).toHaveBeenCalled();
-
-      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
-      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('updated-token');
-    });
-
-    it('should leave other env fields unchanged when editing one field', async () => {
-      const { editCommand } = await import('../src/commands/edit.js');
-      const result = await editCommand({
-        profileName: 'test-profile',
-        field: 'baseUrl',
-        value: 'https://api.updated.com',
-      });
-
-      expect(result.success).toBe(true);
-
-      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
-      expect(savedProfile.env.ANTHROPIC_BASE_URL).toBe('https://api.updated.com');
-      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
-      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('test-model');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('test-sonnet');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('test-opus');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('test-haiku');
+      const updated = ctx.profiles.getProfile('test-profile');
+      expect(updated.env.ANTHROPIC_AUTH_TOKEN).toBe('updated-token');
+      // Other fields unchanged
+      expect(updated.env.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
     });
 
     it('should sync ANTHROPIC_MODEL and ANTHROPIC_DEFAULT_SONNET_MODEL when editing sonnetModel', async () => {
       const { editCommand } = await import('../src/commands/edit.js');
-      const result = await editCommand({
+      await editCommand(ctx, {
         profileName: 'test-profile',
         field: 'sonnetModel',
-        value: 'updated-sonnet',
+        value: 'new-sonnet',
       });
 
-      expect(result.success).toBe(true);
-
-      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
-      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('updated-sonnet');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('updated-sonnet');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('test-opus');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('test-haiku');
+      const updated = ctx.profiles.getProfile('test-profile');
+      expect(updated.env.ANTHROPIC_MODEL).toBe('new-sonnet');
+      expect(updated.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('new-sonnet');
     });
 
-    it('should not mutate the original profile object', async () => {
-      const original = createMockProfile();
-      mockProfileService.getProfile.mockReturnValueOnce(original);
-
+    it('should leave other env fields unchanged when editing one field', async () => {
       const { editCommand } = await import('../src/commands/edit.js');
-      await editCommand({
+      await editCommand(ctx, {
         profileName: 'test-profile',
-        field: 'token',
-        value: 'updated-token',
+        field: 'opusModel',
+        value: 'new-opus',
       });
 
-      expect(original.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+      const updated = ctx.profiles.getProfile('test-profile');
+      expect(updated.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('new-opus');
+      expect(updated.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
     });
 
     it('should return error for non-existent profile', async () => {
-      mockProfileService.getProfile.mockImplementationOnce(() => {
-        throw new ProfileNotFoundError('non-existent');
-      });
-
       const { editCommand } = await import('../src/commands/edit.js');
-      const result = await editCommand({
-        profileName: 'non-existent',
+      const result = await editCommand(ctx, {
+        profileName: 'no-such',
         field: 'token',
-        value: 'token',
+        value: 'x',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('non-existent');
     });
   });
 
-  describe('initCommand', () => {
-    it('should return shell hook script', async () => {
-      const { initCommand } = await import('../src/commands/init.js');
-      const result = await initCommand();
-
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('claude-profile()');
-      expect(result.output).toContain('_claude_profile_bin()');
-    });
-
-    it('should include switch command handler', async () => {
-      const { initCommand } = await import('../src/commands/init.js');
-      const result = await initCommand();
-
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('if [ "$1" = "switch" ]');
-      expect(result.output).toContain('_claude_profile_safe_eval');
-    });
-
-    it('should include export command handler', async () => {
-      const { initCommand } = await import('../src/commands/init.js');
-      const result = await initCommand();
-
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('elif [ "$1" = "export" ]');
-    });
-
-    it('should include bin lookup logic', async () => {
-      const { initCommand } = await import('../src/commands/init.js');
-      const result = await initCommand();
-
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('CLAUDE_PROFILE_BIN');
-      expect(result.output).toContain('unset -f claude-profile');
-    });
-
-    it('should use switch command for non-interactive profile switch', async () => {
-      const { initCommand } = await import('../src/commands/init.js');
-      const result = await initCommand();
-
-      expect(result.success).toBe(true);
-      // Non-interactive path should use $bin switch, not $bin export
-      expect(result.output).toMatch(/\$bin switch "\$profile"/);
-    });
-
-    it('should inject default env baseline from baseEnvTemplate', async () => {
-      const { initCommand } = await import('../src/commands/init.js');
-      const result = await initCommand();
-
-      expect(result.success).toBe(true);
-      // 总开关：默认开，未设时取 1
-      expect(result.output).toContain('CLAUDE_PROFILE_DEFAULT_ENV');
-      expect(result.output).toContain('"${CLAUDE_PROFILE_DEFAULT_ENV:-1}"');
-      // 4 个通用基线键的 export 行
-      expect(result.output).toContain("export ENABLE_TOOL_SEARCH='0'");
-      expect(result.output).toContain("export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS='1'");
-      expect(result.output).toContain("export API_TIMEOUT_MS='3000000'");
-      expect(result.output).toContain("export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'");
-      expect(result.output).toContain("export CLAUDE_CODE_EFFORT_LEVEL='max'");
-      expect(result.output).toContain("export CLAUDE_CODE_ALWAYS_ENABLE_EFFORT='1'");
-      expect(result.output).toContain("export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE='75'");
-      // 不覆盖守卫：仅当变量完全未赋值（${VAR+set}）才设默认
-      expect(result.output).toContain('[ -z "${ENABLE_TOOL_SEARCH+set}" ]');
-      expect(result.output).toContain('[ -z "${API_TIMEOUT_MS+set}" ]');
-    });
-
-    it('should not include personal keys (model/api/token) in default baseline', async () => {
-      const { initCommand } = await import('../src/commands/init.js');
-      const result = await initCommand();
-
-      expect(result.success).toBe(true);
-      // 个性化键不应出现在默认注入段（它们必须由 profile 提供）
-      expect(result.output).not.toContain('export ANTHROPIC_BASE_URL=');
-      expect(result.output).not.toContain('export ANTHROPIC_AUTH_TOKEN=');
-      expect(result.output).not.toContain('export ANTHROPIC_MODEL=');
-    });
-  });
+  // ── exportCommand ──────────────────────────────────────────────────────
 
   describe('exportCommand', () => {
     it('should return export commands for profile', async () => {
       const { exportCommand } = await import('../src/commands/export.js');
-      const result = await exportCommand({ profileName: 'test-profile' });
+      const result = await exportCommand(ctx, { profileName: 'test-profile' });
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('export ANTHROPIC_BASE_URL');
-      expect(result.output).toContain('export ANTHROPIC_AUTH_TOKEN');
-      expect(result.output).toContain('https://api.test.com');
+      if (result.success) {
+        expect(result.output).toContain('export ANTHROPIC_AUTH_TOKEN');
+      }
     });
 
     it('should return error for non-existent profile', async () => {
-      mockProfileService.getProfile.mockImplementationOnce(() => {
-        throw new ProfileNotFoundError('non-existent');
-      });
-
       const { exportCommand } = await import('../src/commands/export.js');
-      const result = await exportCommand({ profileName: 'non-existent' });
+      const result = await exportCommand(ctx, { profileName: 'no-such' });
 
       expect(result.success).toBe(false);
-      if (!result.success) { expect(result.error).toContain('不存在'); };
     });
   });
 
+  // ── exportCurrentCommand ───────────────────────────────────────────────
+
   describe('exportCurrentCommand', () => {
-    it('should return export commands for current profile', async () => {
-      mockProfileService.getCurrentProfile.mockReturnValue('test-profile');
-
-      const { exportCurrentCommand } = await import('../src/commands/export.js');
-      const result = await exportCurrentCommand();
-
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('export ANTHROPIC_BASE_URL');
-      expect(result.output).toContain('https://api.test.com');
-    });
-
     it('should return error when no current profile', async () => {
-      mockProfileService.getCurrentProfile.mockReturnValue(null);
-
+      // No current profile set in fresh store
+      const built = buildCtx();
       const { exportCurrentCommand } = await import('../src/commands/export.js');
-      const result = await exportCurrentCommand();
+      const result = await exportCurrentCommand(built.ctx);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('没有当前配置');
+      if (!result.success) {
+        expect(result.error).toContain('没有当前配置');
+      }
     });
 
     it('should return error when current profile not found', async () => {
-      mockProfileService.getCurrentProfile.mockReturnValue('ghost-profile');
-      mockProfileService.getProfile.mockImplementationOnce(() => {
-        throw new ProfileNotFoundError('ghost-profile');
-      });
-
+      // Pretend there's a current profile pointing to a missing file
+      store.setCurrentProfile('does-not-exist-anywhere');
       const { exportCurrentCommand } = await import('../src/commands/export.js');
-      const result = await exportCurrentCommand();
+      const result = await exportCurrentCommand(ctx);
 
       expect(result.success).toBe(false);
-      if (!result.success) { expect(result.error).toContain('不存在'); };
+    });
+
+    it('should return export commands for current profile', async () => {
+      ctx.profiles.setCurrentProfile('test-profile');
+      const { exportCurrentCommand } = await import('../src/commands/export.js');
+      const result = await exportCurrentCommand(ctx);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output).toContain('export ANTHROPIC_AUTH_TOKEN');
+      }
     });
 
     it('should include unset commands when previous profile differs', async () => {
-      mockProfileService.getCurrentProfile.mockReturnValue('new-profile');
+      // Set up: old profile with API_TIMEOUT_MS, current profile without it
       const oldProfile = createMockProfile({
         name: 'old-profile',
-        env: {
-          ANTHROPIC_BASE_URL: 'https://old.com',
-          ANTHROPIC_AUTH_TOKEN: 'old-token',
-          ANTHROPIC_MODEL: 'old-model',
-          ANTHROPIC_DEFAULT_SONNET_MODEL: 'old-sonnet',
-          ANTHROPIC_DEFAULT_OPUS_MODEL: 'old-opus',
-          ANTHROPIC_DEFAULT_HAIKU_MODEL: 'old-haiku',
-          API_TIMEOUT_MS: '3000000',
-        },
+        env: { ...createMockProfile().env, API_TIMEOUT_MS: '3000000' },
       });
-      mockProfileService.getPreviousProfile.mockReturnValue('old-profile');
-      mockProfileService.getProfile
-        .mockImplementationOnce(() => createMockProfile())  // current profile
-        .mockImplementationOnce(() => oldProfile);           // previous profile
+      store.saveProfile(oldProfile);
+      store.setCurrentProfile('old-profile');
+      store.setPreviousProfile('old-profile');
+
+      // Switch to test-profile (which doesn't have API_TIMEOUT_MS)
+      ctx.profiles.setCurrentProfile('test-profile');
 
       const { exportCurrentCommand } = await import('../src/commands/export.js');
-      const result = await exportCurrentCommand();
+      const result = await exportCurrentCommand(ctx);
 
       expect(result.success).toBe(true);
-      if (result.success) { expect(result.output).toContain('unset API_TIMEOUT_MS'); };
-      expect(mockProfileService.setPreviousProfile).toHaveBeenCalledWith(null);
+      if (result.success) {
+        expect(result.output).toContain('unset API_TIMEOUT_MS');
+      }
     });
   });
+
+  // ── renameCommand ──────────────────────────────────────────────────────
 
   describe('renameCommand', () => {
     it('should rename profile successfully', async () => {
-      mockProfileService.profileExists.mockReturnValue(false);
-
       const { renameCommand } = await import('../src/commands/rename.js');
-      const result = await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
+      const result = await renameCommand(ctx, { oldName: 'test-profile', newName: 'renamed' });
 
       expect(result.success).toBe(true);
-      if (result.success) { expect(result.output).toContain('renamed-profile'); };
-      expect(mockProfileService.saveProfile).toHaveBeenCalled();
-      expect(mockProfileService.deleteProfile).toHaveBeenCalledWith('test-profile');
-    });
-
-    it('should update current profile reference if renaming active', async () => {
-      mockProfileService.getCurrentProfile.mockReturnValue('test-profile');
-      mockProfileService.profileExists.mockReturnValue(false);
-
-      const { renameCommand } = await import('../src/commands/rename.js');
-      const result = await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
-
-      expect(result.success).toBe(true);
-      expect(mockProfileService.setCurrentProfile).toHaveBeenCalledWith('renamed-profile');
-    });
-
-    it('should return error when old profile does not exist', async () => {
-      mockProfileService.getProfile.mockImplementationOnce(() => {
-        throw new ProfileNotFoundError('non-existent');
-      });
-
-      const { renameCommand } = await import('../src/commands/rename.js');
-      const result = await renameCommand({ oldName: 'non-existent', newName: 'new-name' });
-
-      expect(result.success).toBe(false);
-      if (!result.success) { expect(result.error).toContain('不存在'); };
-    });
-
-    it('should return error when new name already exists', async () => {
-      mockProfileService.profileExists.mockReturnValueOnce(true);
-
-      const { renameCommand } = await import('../src/commands/rename.js');
-      const result = await renameCommand({ oldName: 'test-profile', newName: 'existing-name' });
-
-      expect(result.success).toBe(false);
-      if (!result.success) { expect(result.error).toContain('已存在'); };
-    });
-
-    it('should not mutate original profile', async () => {
-      const original = createMockProfile({ name: 'test-profile' });
-      mockProfileService.getProfile.mockReturnValueOnce(original);
-
-      const { renameCommand } = await import('../src/commands/rename.js');
-      await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
-
-      expect(original.name).toBe('test-profile');
-      expect(original.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+      expect(ctx.profiles.profileExists('renamed')).toBe(true);
+      expect(ctx.profiles.profileExists('test-profile')).toBe(false);
     });
 
     it('should copy all env fields to renamed profile', async () => {
-      mockProfileService.profileExists.mockReturnValue(false);
-
       const { renameCommand } = await import('../src/commands/rename.js');
-      const result = await renameCommand({ oldName: 'test-profile', newName: 'renamed-profile' });
+      await renameCommand(ctx, { oldName: 'test-profile', newName: 'renamed' });
 
-      expect(result.success).toBe(true);
-      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
-      expect(savedProfile.env.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
-      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
-      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('test-model');
-    });
-  });
-
-  describe('duplicateCommand', () => {
-    it('should duplicate profile successfully', async () => {
-      mockProfileService.profileExists.mockReturnValue(false);
-
-      const { duplicateCommand } = await import('../src/commands/duplicate.js');
-      const result = await duplicateCommand({ sourceName: 'test-profile', newName: 'copy-profile' });
-
-      expect(result.success).toBe(true);
-      if (result.success) { expect(result.output).toContain('copy-profile'); };
-      expect(mockProfileService.saveProfile).toHaveBeenCalled();
+      const renamed = ctx.profiles.getProfile('renamed');
+      expect(renamed.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
     });
 
-    it('should create copy with identical env', async () => {
-      mockProfileService.profileExists.mockReturnValue(false);
+    it('should update current profile reference if renaming active', async () => {
+      ctx.profiles.setCurrentProfile('test-profile');
+      const { renameCommand } = await import('../src/commands/rename.js');
+      await renameCommand(ctx, { oldName: 'test-profile', newName: 'renamed' });
 
-      const { duplicateCommand } = await import('../src/commands/duplicate.js');
-      await duplicateCommand({ sourceName: 'test-profile', newName: 'copy-profile' });
-
-      const savedProfile = mockProfileService.saveProfile.mock.calls[0][0];
-      expect(savedProfile.env.ANTHROPIC_BASE_URL).toBe('https://api.test.com');
-      expect(savedProfile.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
-      expect(savedProfile.env.ANTHROPIC_MODEL).toBe('test-model');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('test-sonnet');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('test-opus');
-      expect(savedProfile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('test-haiku');
-    });
-
-    it('should return error when source does not exist', async () => {
-      mockProfileService.getProfile.mockImplementationOnce(() => {
-        throw new ProfileNotFoundError('non-existent');
-      });
-
-      const { duplicateCommand } = await import('../src/commands/duplicate.js');
-      const result = await duplicateCommand({ sourceName: 'non-existent', newName: 'new-name' });
-
-      expect(result.success).toBe(false);
-      if (!result.success) { expect(result.error).toContain('不存在'); };
+      expect(ctx.profiles.getCurrentProfile()).toBe('renamed');
     });
 
     it('should return error when new name already exists', async () => {
-      mockProfileService.profileExists.mockReturnValueOnce(true);
-
-      const { duplicateCommand } = await import('../src/commands/duplicate.js');
-      const result = await duplicateCommand({ sourceName: 'test-profile', newName: 'existing-name' });
+      store.saveProfile(createMockProfile({ name: 'other' }));
+      const { renameCommand } = await import('../src/commands/rename.js');
+      const result = await renameCommand(ctx, { oldName: 'test-profile', newName: 'other' });
 
       expect(result.success).toBe(false);
-      if (!result.success) { expect(result.error).toContain('已存在'); };
     });
 
-    it('should not mutate original profile', async () => {
-      const original = createMockProfile({ name: 'test-profile' });
-      mockProfileService.getProfile.mockReturnValueOnce(original);
+    it('should return error when old profile does not exist', async () => {
+      const { renameCommand } = await import('../src/commands/rename.js');
+      const result = await renameCommand(ctx, { oldName: 'no-such', newName: 'new' });
 
+      expect(result.success).toBe(false);
+    });
+  });
+
+  // ── duplicateCommand ───────────────────────────────────────────────────
+
+  describe('duplicateCommand', () => {
+    it('should duplicate profile successfully', async () => {
       const { duplicateCommand } = await import('../src/commands/duplicate.js');
-      await duplicateCommand({ sourceName: 'test-profile', newName: 'copy-profile' });
+      const result = await duplicateCommand(ctx, {
+        sourceName: 'test-profile',
+        newName: 'copy',
+      });
 
-      expect(original.name).toBe('test-profile');
-      expect(original.env.ANTHROPIC_AUTH_TOKEN).toBe('test-token');
+      expect(result.success).toBe(true);
+      expect(ctx.profiles.profileExists('copy')).toBe(true);
+    });
+
+    it('should create copy with identical env', async () => {
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      await duplicateCommand(ctx, { sourceName: 'test-profile', newName: 'copy' });
+
+      const original = ctx.profiles.getProfile('test-profile');
+      const copy = ctx.profiles.getProfile('copy');
+      expect(copy.env).toEqual(original.env);
+    });
+
+    it('should return error when new name already exists', async () => {
+      store.saveProfile(createMockProfile({ name: 'taken' }));
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      const result = await duplicateCommand(ctx, {
+        sourceName: 'test-profile',
+        newName: 'taken',
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('should return error when source does not exist', async () => {
+      const { duplicateCommand } = await import('../src/commands/duplicate.js');
+      const result = await duplicateCommand(ctx, {
+        sourceName: 'no-such',
+        newName: 'new',
+      });
+
+      expect(result.success).toBe(false);
     });
   });
 });

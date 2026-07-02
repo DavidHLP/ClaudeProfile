@@ -1,21 +1,20 @@
 import { writeFileSync } from 'fs';
-import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envRenderer.js';
 import { buildExportCommands, buildSwitchCommands, buildExportJson, buildSwitchJson } from '../engine/envDiff.js';
 import { CommandResult, ExportFileInput } from '../types/command.js';
-import { runCommand } from './runner.js';
 import { resolveOldEnv } from '../engine/activation.js';
 import { FileOperationError } from '../errors.js';
 import * as YAML from 'yaml';
+import type { CommandContext } from './context.js';
+import { runCommand } from './runner.js';
 
 export interface ExportProfileInput {
   profileName: string;
   json?: boolean;
 }
 
-export async function exportCommand(input: ExportProfileInput): Promise<CommandResult> {
+export async function exportCommand(ctx: CommandContext, input: ExportProfileInput): Promise<CommandResult> {
   return runCommand('导出配置', async () => {
-    const profile = profileService.getProfile(input.profileName);
+    const profile = ctx.profiles.getProfile(input.profileName);
 
     if (input.json) {
       const jsonOutput = buildExportJson(profile.env);
@@ -27,20 +26,20 @@ export async function exportCommand(input: ExportProfileInput): Promise<CommandR
   });
 }
 
-export async function exportCurrentCommand(input: { json?: boolean } = {}): Promise<CommandResult> {
+export async function exportCurrentCommand(ctx: CommandContext, input: { json?: boolean } = {}): Promise<CommandResult> {
   return runCommand('导出当前配置', async () => {
-    const currentProfile = profileService.getCurrentProfile();
+    const currentProfile = ctx.profiles.getCurrentProfile();
     if (!currentProfile) {
       return { success: false, error: '没有当前配置' };
     }
 
-    const profile = profileService.getProfile(currentProfile);
+    const profile = ctx.profiles.getProfile(currentProfile);
 
-    const previousProfileName = profileService.getPreviousProfile();
-    const oldEnv = resolveOldEnv(profileService, previousProfileName, currentProfile);
+    const previousProfileName = ctx.profiles.getPreviousProfile();
+    const oldEnv = resolveOldEnv(ctx.profiles, previousProfileName, currentProfile);
 
     // Clean up .current-prev after use
-    profileService.setPreviousProfile(null);
+    ctx.profiles.setPreviousProfile(null);
 
     if (input.json) {
       const jsonOutput = buildSwitchJson(oldEnv, profile.env);
@@ -52,9 +51,9 @@ export async function exportCurrentCommand(input: { json?: boolean } = {}): Prom
   });
 }
 
-export async function exportFileCommand(input: ExportFileInput): Promise<CommandResult> {
+export async function exportFileCommand(ctx: CommandContext, input: ExportFileInput): Promise<CommandResult> {
   return runCommand('导出配置文件', async () => {
-    const profile = profileService.getProfile(input.profileName);
+    const profile = ctx.profiles.getProfile(input.profileName);
     const format = input.format || 'json';
     const outputPath = input.outputPath || `${profile.name}.${format}`;
 
@@ -79,18 +78,18 @@ export async function exportFileCommand(input: ExportFileInput): Promise<Command
       throw new FileOperationError('write', outputPath, err);
     }
 
-    return { success: true, output: envPresenter.formatExportSuccess(profile.name, outputPath) };
+    return { success: true, output: ctx.env.formatExportSuccess(profile.name, outputPath) };
   });
 }
 
-export async function exportCurrentFileCommand(input: { format?: 'json' | 'yaml'; outputPath?: string }): Promise<CommandResult> {
+export async function exportCurrentFileCommand(ctx: CommandContext, input: { format?: 'json' | 'yaml'; outputPath?: string }): Promise<CommandResult> {
   return runCommand('导出当前配置文件', async () => {
-    const currentProfile = profileService.getCurrentProfile();
+    const currentProfile = ctx.profiles.getCurrentProfile();
     if (!currentProfile) {
       return { success: false, error: '没有当前配置' };
     }
 
-    return exportFileCommand({
+    return exportFileCommand(ctx, {
       profileName: currentProfile,
       format: input.format,
       outputPath: input.outputPath,
