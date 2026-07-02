@@ -75,11 +75,6 @@ describe('CommandContext', () => {
         'inputProfileName',
         'promptForNewName',
         'inputProfileField',
-        'inputApiToken',
-        'inputBaseUrl',
-        'inputSonnetModel',
-        'inputOpusModel',
-        'inputHaikuModel',
         'selectProfileFromList',
         'selectEditField',
         'selectBackup',
@@ -88,6 +83,13 @@ describe('CommandContext', () => {
       ];
       for (const fn of expected) {
         expect(typeof r[fn]).toBe('function');
+      }
+    });
+
+    it('does NOT expose the dropped 5 inputXxx shims (Candidate 4)', () => {
+      const r = realPrompts as unknown as Record<string, unknown>;
+      for (const fn of ['inputApiToken', 'inputBaseUrl', 'inputSonnetModel', 'inputOpusModel', 'inputHaikuModel']) {
+        expect(r[fn]).toBeUndefined();
       }
     });
   });

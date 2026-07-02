@@ -12,6 +12,18 @@
  * dependency, and tests can supply a mock that satisfies the whole
  * interface at once. Individual function re-exports would force tests
  * to mock one function at a time and to import the module.
+ *
+ * Note on the per-field prompt methods
+ * -----------------------------------
+ * ADR-0003 preserved the 5 hand-rolled `inputApiToken` / `inputBaseUrl` /
+ * `inputSonnetModel` / `inputOpusModel` / `inputHaikuModel` methods on
+ * `Prompts` "for back-compat with any external embedder that depended
+ * on them." Since this is a CLI with no embedders (and the create /
+ * edit paths use `inputProfileField` exclusively), the 5 shims have
+ * been removed from the `Prompts` interface. The underlying functions
+ * still exist as top-level exports of `ui/prompt.ts` for any future
+ * embedder that wants them — they are simply no longer part of the
+ * command-facing seam.
  */
 import type { Profile, ProviderTemplate } from '../types/index.js';
 import type { EditableField } from '../types/command.js';
@@ -30,19 +42,14 @@ export interface Prompts {
    * Replaces the 5 hand-rolled `inputApiToken` / `inputBaseUrl` /
    * `inputSonnetModel` / `inputOpusModel` / `inputHaikuModel` methods
    * for the `create` and `edit` interactive paths. The per-field
-   * prompt methods below are preserved for back-compat with any
-   * embedder that depended on them; new code should call
+   * prompt functions below are still available as top-level exports
+   * of `ui/prompt.ts` for any embedder; new code should call
    * `inputProfileField` instead.
    */
   inputProfileField(
     field: ProfileField,
     options?: { defaultValue?: string }
   ): Promise<string>;
-  inputApiToken(): Promise<string>;
-  inputBaseUrl(defaultValue?: string): Promise<string>;
-  inputSonnetModel(defaultValue?: string): Promise<string>;
-  inputOpusModel(defaultValue?: string): Promise<string>;
-  inputHaikuModel(defaultValue?: string): Promise<string>;
   selectProfileFromList(profiles: Profile[], currentProfile: string | null): Promise<string | null>;
   selectEditField(profile: Profile): Promise<EditableField | null>;
   selectBackup(backups: { name: string; path: string; date: Date }[]): Promise<string | null>;
@@ -71,11 +78,6 @@ export const realPrompts: Prompts = {
       validate: spec.validateInput,
     });
   },
-  inputApiToken: () => prompt.inputApiToken(),
-  inputBaseUrl: (defaultValue) => prompt.inputBaseUrl(defaultValue),
-  inputSonnetModel: (defaultValue) => prompt.inputSonnetModel(defaultValue),
-  inputOpusModel: (defaultValue) => prompt.inputOpusModel(defaultValue),
-  inputHaikuModel: (defaultValue) => prompt.inputHaikuModel(defaultValue),
   selectProfileFromList: (profiles, currentProfile) => prompt.selectProfileFromList(profiles, currentProfile),
   selectEditField: (profile) => prompt.selectEditField(profile),
   selectBackup: (backups) => prompt.selectBackup(backups),

@@ -119,11 +119,18 @@ module-level singletons.** A `CommandContext` is the test surface for
 every command.
 
 ### Prompts
-The interactive-UI seam. A `Prompts` object exposes every inquirer
-function a command might need (`selectProvider`, `inputApiToken`,
-`confirmAction`, etc.). `realPrompts` is the inquirer-backed
-implementation; `noopPrompts` is the test default (returns empty
-strings / nulls / false).
+The interactive-UI seam. A `Prompts` object exposes 9 inquirer-backed
+methods a command might need (`selectProvider`, `inputProfileField`,
+`selectProfileFromList`, `confirmAction`, etc.). `realPrompts` is
+the inquirer-backed implementation; `noopPrompts` is the test
+default (returns empty strings / nulls / false).
+
+The 5 legacy per-field prompt functions (`inputApiToken`,
+`inputBaseUrl`, `inputSonnetModel`, `inputOpusModel`,
+`inputHaikuModel`) live as top-level exports of `ui/prompt.ts` for
+embedder back-compat; they are not on the `Prompts` interface. New
+code uses `inputProfileField` (ADR-0003) or imports the top-level
+function directly (ADR-0009).
 
 ### Env Presenter
 The human-facing output formatter. Owns every `format*` method that
@@ -191,6 +198,60 @@ primitive — `CancelledError` — and converts it to a uniform
 `{ success: false, wasCancelled: true }` result; `runner.toCommandResult`
 honors the same primitive so `runCommand`-wrapped code can throw it
 without losing the `wasCancelled` flag.
+
+
+### BackupStore
+The port for backup and restore of the config directory. Owns
+`create(sourceDir, outputPath?)`, `extract(archivePath, targetDir)`,
+`list()`, `getBackupDir()`, and `generateBackupName()`. Two adapters
+ship: `FileSystemBackupStore` (prod, tar-based) and
+`InMemoryBackupStore` (tests). The security checks
+(path-traversal, symlink rejection) live at the port boundary, where
+the hostile archive crosses into our process. `ctx.backup` is the
+5th field of `CommandContext`. The production singleton is
+`backupStore`; tests inject `InMemoryBackupStore` via
+`createTestContext({ backup: ... })`. **All backup and restore
+code goes through this seam; tar-specific knowledge is never
+duplicated outside `FileSystemBackupStore`.**
+
+### Diagnostic
+The canonical diagnostic-report shape for `claude-profile doctor`.
+Lives in `domain/diagnostic.ts` and owns: the `CheckStatus` union
+(`'ok' | 'warning' | 'error'`), the `CheckResult` interface, the 7
+named check functions (config dir, profile files, profile security,
+current profile, shell hook, git repo, env consistency), and the
+`runDiagnostics(ctx): CheckResult[]` runner. The report shape is
+owned by `EnvPresenter.formatDiagnosticReport` — the command layer
+never inlines the per-check line format or the summary line. The
+deletion test: remove the diagnostic module and the 7 check
+functions reappear in `doctorCommand` within 20 lines.
+
+### Env Diff Primitive
+The `diffEnvs(oldEnv, newEnv): { set, unset }` function in
+`engine/envDiff.ts` that is the single source of truth for the
+"diff two envs" computation. All 4 wire-format builders
+(`buildExportJson`, `buildSwitchJson`, `buildExportCommands`,
+`buildSwitchCommands`) are 1-line adapters that consume the
+primitive. Three formatters (`formatEnvJson`, `formatExportShell`,
+`formatSwitchShell`) are exported for callers that already have a
+diff in hand. **All env diffs go through this primitive; the
+`oldKeys`/`newKeys` iteration is never duplicated outside
+`diffEnvs`.**
+
+### Interactive Selection Flow
+The "select from a list, build input, optionally confirm, then
+execute" shape shared by all `*Interactive` commands. Lives in
+`commands/interactiveSession.ts` as the `runSelectableAction`
+higher-order function and a `SelectableActionFlow` descriptor. The
+profile-specific alias `runProfileAction` is the thin back-compat
+form for the 7 commands that select profiles; the
+`restoreCommandInteractive` flow uses `runSelectableAction` with
+`TSelected = string` (the backup path). The selection UI itself
+stays in `Prompts` (`selectProfileFromList`) for the profile flow;
+non-profile flows render an inquirer list inline. **Every
+`*Interactive` command that selects from a list composes this
+flow; the list/empty/select/confirm/return-cancelled sequence is
+never re-implemented by hand.**
 
 ## Vocabulary discipline
 
