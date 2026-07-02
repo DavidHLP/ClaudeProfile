@@ -1,7 +1,7 @@
 import { DuplicateProfileInput, CommandResult } from '../types/command.js';
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
-import { runSelectableAction, CancelledError } from './interactiveSession.js';
+import { runProfileAction, CancelledError } from './interactiveSession.js';
 
 export async function duplicateCommand(ctx: CommandContext, input: DuplicateProfileInput): Promise<CommandResult> {
   return runCommand('复制配置', async () => {
@@ -16,11 +16,9 @@ export async function duplicateCommand(ctx: CommandContext, input: DuplicateProf
 }
 
 export async function duplicateCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
-  return runSelectableAction(ctx, {
+  return runProfileAction(ctx, {
     verb: '复制',
     emptyMessage: '没有可复制的配置。',
-    list: (c) => c.profiles.listProfiles(),
-    currentKey: (c) => c.profiles.getCurrentProfile(),
     confirm: (selected, input) => `确定要复制配置 '${selected.name}' 到 '${input.newName}' 吗？`,
     buildInput: async (selected, ctx) => {
       const newName = await ctx.prompts.promptForNewName(selected.name + '-copy');

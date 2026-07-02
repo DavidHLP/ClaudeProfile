@@ -358,29 +358,66 @@ export function profileKeyOf(profile: Profile): string {
 }
 
 /**
- * Back-compat alias: the original `runProfileAction` is
- * `runSelectableAction` with `T` fixed to `Profile` and the
- * profile-specific defaults wired in. New code should use
- * `runSelectableAction<Profile, TInput>` directly; this alias
- * exists so the 7 existing `*Interactive` commands keep their
- * `runProfileAction` import and don't have to wire
- * `formatChoice` / `keyOf` themselves.
+ * The single home for the 6 "select a profile" interactive flows
+ * (`deleteCommandInteractive`, `renameCommandInteractive`,
+ * `duplicateCommandInteractive`, `editCommandInteractive`,
+ * `switchCommandInteractive`).
+ *
+ * `runProfileAction<TInput>(ctx, flow)` is `runSelectableAction` with
+ * `T` fixed to `Profile` and the four profile-flow defaults wired
+ * in: every caller that selects a profile reads the profile list
+ * from the service, renders the rich `● name — description token`
+ * row, uses the profile name as the inquirer choice `value`, and
+ * defaults the selection cursor to the active profile.
+ *
+ * Migration note (deepening this replaces): the previous deepening
+ * claimed the 6 commands had been "migrated to `runProfileAction`"
+ * — but the actual code kept calling `runSelectableAction` and
+ * supplied `list: (c) => c.profiles.listProfiles()` and
+ * `currentKey: (c) => c.profiles.getCurrentProfile()` by hand.
+ * Two consequences flowed from that half-migration:
+ *
+ *   1. The 6 commands never received `formatChoice` / `keyOf`, so
+ *      inquirer rendered each profile as `[object Object]`. The bug
+ *      was latent because `tests/commands.test.ts` does not exercise
+ *      the interactive path; a 1-line probe (`runSelectableAction`
+ *      with no `formatChoice` and a `Profile` list) reproduces it.
+ *   2. `list: (c) => c.profiles.listProfiles()` and
+ *      `currentKey: (c) => c.profiles.getCurrentProfile()` were
+ *      duplicated 6 times — a textbook shallow pass-through.
+ *
+ * `runProfileAction` now owns all four defaults. The 6 callers
+ * supply only the bits that are genuinely command-specific (verb,
+ * empty message, input builder, optional confirmation, the
+ * underlying non-interactive command). The seam fracture is closed.
+ *
+ * Callers may still override any of the four defaults; the
+ * `Omit<..., 'list' | 'formatChoice' | 'keyOf'> & { list?: ...; formatChoice?: ... }`
+ * shape allows overrides while keeping the type strict (no
+ * `any` slipping in for `keyOf` / `currentKey`).
  */
 export async function runProfileAction<TInput>(
   ctx: CommandContext,
-  flow: Omit<SelectableActionFlow<Profile, TInput>, 'list' | 'formatChoice' | 'keyOf'> & {
+  flow: Omit<
+    SelectableActionFlow<Profile, TInput>,
+    'list' | 'formatChoice' | 'keyOf' | 'currentKey'
+  > & {
     list?: (ctx: CommandContext) => readonly Profile[];
     formatChoice?: (item: Profile, ctx: CommandContext) => string;
+    currentKey?: (ctx: CommandContext) => string | null;
   },
 ): Promise<CommandResult> {
   return runSelectableAction<Profile, TInput>(ctx, {
     ...flow,
     // Defaults: profiles flow's `list` reads from the service,
-    // `formatChoice` renders the rich profile row, and `keyOf`
-    // matches by profile name. Callers may override any of these.
+    // `formatChoice` renders the rich profile row, `keyOf`
+    // matches by profile name, and `currentKey` defaults to the
+    // active profile so the inquirer cursor lands on the
+    // currently-active row. Callers may override any of these.
     list: flow.list ?? ((c) => c.profiles.listProfiles()),
     formatChoice: flow.formatChoice ?? profileChoice,
     keyOf: profileKeyOf,
+    currentKey: flow.currentKey ?? ((c) => c.profiles.getCurrentProfile()),
   });
 }
 

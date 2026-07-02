@@ -3,7 +3,7 @@ import { SwitchProfileInput, CommandResult } from '../types/command.js';
 import { resolveOldEnv } from '../engine/activation.js';
 import { runCommand } from './runner.js';
 import type { CommandContext } from './context.js';
-import { runSelectableAction } from './interactiveSession.js';
+import { runProfileAction } from './interactiveSession.js';
 
 export async function switchCommand(ctx: CommandContext, input: SwitchProfileInput): Promise<CommandResult> {
   return runCommand('切换配置', async () => {
@@ -36,7 +36,7 @@ export async function switchCommandInteractive(ctx: CommandContext): Promise<Com
   // own message (and doesn't need the banner). Everything else —
   // the single-profile shortcut, the prompt, the "save previous
   // profile" side effect, and the dispatch to `switchCommand` —
-  // goes through the `runSelectableAction` seam.
+  // goes through the `runProfileAction` seam.
   const profiles = ctx.profiles.listProfiles();
   if (profiles.length === 0) {
     return { success: false, error: '没有可用的配置。请先使用 create 命令创建配置。' };
@@ -47,16 +47,17 @@ export async function switchCommandInteractive(ctx: CommandContext): Promise<Com
   console.log(ctx.env.formatBanner());
 
   const currentProfile = ctx.profiles.getCurrentProfile();
-  return runSelectableAction<typeof profiles[number], SwitchProfileInput>(ctx, {
+  return runProfileAction<SwitchProfileInput>(ctx, {
     verb: '切换',
     emptyMessage: '没有可用的配置。请先使用 create 命令创建配置。',
     // The seam's pre-flight: when there's exactly one profile and
     // it's already the current one, skip the prompt entirely. This
     // replaces the hand-rolled `profiles.length === 1 && profiles[0].name === currentProfile`
-    // pre-flight that used to live here.
+    // pre-flight that used to live here. The `currentKey` default
+    // (active profile) is supplied by `runProfileAction`, so the
+    // single-item shortcut is keyed off the active profile name
+    // for free.
     skipSelectionWhenSingleMatch: true,
-    list: (c) => c.profiles.listProfiles(),
-    currentKey: (c) => c.profiles.getCurrentProfile(),
     buildInput: async (selected, c) => {
       // Save the old profile name so `export --current` can diff
       // against it on the next call. `switchCommand` itself does

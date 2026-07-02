@@ -2,7 +2,7 @@ import { EnvConfig } from '../types/index.js';
 import { EditableField, EditProfileInput, CommandResult } from '../types/command.js';
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
-import { runSelectableAction, CancelledError } from './interactiveSession.js';
+import { runProfileAction, CancelledError } from './interactiveSession.js';
 import { applyField, getFieldValue, PROFILE_FIELDS } from '../domain/profileSchema.js';
 
 export async function editCommand(ctx: CommandContext, input: EditProfileInput): Promise<CommandResult> {
@@ -46,11 +46,9 @@ async function promptForEditableField(
 }
 
 export async function editCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
-  return runSelectableAction(ctx, {
+  return runProfileAction(ctx, {
     verb: '编辑',
     emptyMessage: '没有可编辑的配置。请先使用 create 命令创建配置。',
-    list: (c) => c.profiles.listProfiles(),
-    currentKey: (c) => c.profiles.getCurrentProfile(),
     // No `confirm` — `edit` is non-destructive; the user already
     // walked through field selection, so the "are you sure" step
     // would just be friction.

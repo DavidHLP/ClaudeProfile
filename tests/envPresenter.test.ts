@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { envPresenter, buildExportCommands, buildSwitchCommands } from '../src/presenters/envPresenter.js';
+import { envPresenter } from '../src/presenters/envRenderer.js';
+import { buildExportCommands, buildSwitchCommands } from '../src/engine/envDiff.js';
 import { AppError } from '../src/errors.js';
 import type { EnvConfig, Profile } from '../src/types/index.js';
 
