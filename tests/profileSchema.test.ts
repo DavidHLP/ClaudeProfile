@@ -6,6 +6,7 @@ import {
   ProfileField,
   applyField,
   getFieldValue,
+  defaultFieldValue,
   validateProfile,
   profileDetailRows,
   maskProfileValue,
@@ -365,5 +366,61 @@ describe('ProfileField type', () => {
     // Compile-time check: this assignment must succeed without error.
     const fields: ProfileField[] = ['baseUrl', 'token', 'sonnetModel', 'opusModel', 'haikuModel'];
     expect(fields).toHaveLength(5);
+  });
+});
+
+
+describe('defaultFieldValue', () => {
+  it('returns the env value when the primary env key is set', () => {
+    expect(
+      defaultFieldValue(
+        { ANTHROPIC_BASE_URL: 'https://x' },
+        'baseUrl'
+      )
+    ).toBe('https://x');
+  });
+
+  it('returns the env value for SONNET via the primary env key (not the legacy)', () => {
+    // SONNET has two env keys: ANTHROPIC_DEFAULT_SONNET_MODEL (primary)
+    // and ANTHROPIC_MODEL (legacy write-side secondary). defaultFieldValue
+    // must read the primary only.
+    expect(
+      defaultFieldValue(
+        {
+          ANTHROPIC_DEFAULT_SONNET_MODEL: 'new-sonnet',
+          ANTHROPIC_MODEL: 'legacy-sonnet',
+        },
+        'sonnetModel'
+      )
+    ).toBe('new-sonnet');
+  });
+
+  it('falls back to the supplied fallback when the primary env key is empty', () => {
+    expect(
+      defaultFieldValue(
+        { ANTHROPIC_DEFAULT_SONNET_MODEL: '' },
+        'sonnetModel',
+        'provider-default'
+      )
+    ).toBe('provider-default');
+    expect(
+      defaultFieldValue(
+        {},
+        'sonnetModel',
+        'provider-default'
+      )
+    ).toBe('provider-default');
+  });
+
+  it('returns undefined when no env value and no fallback are provided', () => {
+    expect(defaultFieldValue({}, 'token')).toBeUndefined();
+    expect(defaultFieldValue({ ANTHROPIC_BASE_URL: '' }, 'baseUrl')).toBeUndefined();
+  });
+
+  it('works for every field with no env value but a fallback', () => {
+    const fields: ProfileField[] = ['baseUrl', 'token', 'sonnetModel', 'opusModel', 'haikuModel'];
+    for (const field of fields) {
+      expect(defaultFieldValue({}, field, 'fb')).toBe('fb');
+    }
   });
 });

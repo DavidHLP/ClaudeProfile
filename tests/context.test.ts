@@ -74,6 +74,7 @@ describe('CommandContext', () => {
         'selectProvider',
         'inputProfileName',
         'promptForNewName',
+        'inputProfileField',
         'inputApiToken',
         'inputBaseUrl',
         'inputSonnetModel',
@@ -206,5 +207,70 @@ describe('envPresenter.formatProfileDetail', () => {
     // Active marker (●) is rendered in the first line
     const firstLine = output.split('\n')[0];
     expect(firstLine).toMatch(/[●○]/);
+  });
+});
+
+
+describe('inputProfileField (Profile Field Prompt seam)', () => {
+  it('noopPrompts.inputProfileField returns empty string (caller detects via validator)', async () => {
+    expect(await noopPrompts.inputProfileField('token')).toBe('');
+    expect(await noopPrompts.inputProfileField('baseUrl', { defaultValue: 'x' })).toBe('');
+    expect(await noopPrompts.inputProfileField('sonnetModel')).toBe('');
+    expect(await noopPrompts.inputProfileField('opusModel')).toBe('');
+    expect(await noopPrompts.inputProfileField('haikuModel')).toBe('');
+  });
+
+  it('realPrompts.inputProfileField backs onto promptInput with schema label and validator', async () => {
+    // We verify the wiring by checking that realPrompts delegates to
+    // ui/prompt.ts#promptInput with the schema's label and validateInput
+    // for each field. We do this by stubbing inquirer.prompt, which
+    // is the single chokepoint both paths go through.
+    const inquirer = (await import('inquirer')).default as unknown as {
+      prompt: (q: unknown) => Promise<Record<string, unknown>>;
+    };
+    const original = inquirer.prompt;
+    const calls: Array<Record<string, unknown>> = [];
+    inquirer.prompt = (async (q: unknown) => {
+      const question = (Array.isArray(q) ? q[0] : q) as Record<string, unknown>;
+      calls.push(question);
+      // Return a different value per field to prove the wiring.
+      const message = String(question.message ?? '');
+      if (message.startsWith('API Token')) return { value: 'tok-XYZ' };
+      if (message.startsWith('API Base URL')) return { value: 'https://x' };
+      if (message.startsWith('SONNET')) return { value: 'sn' };
+      if (message.startsWith('OPUS')) return { value: 'op' };
+      if (message.startsWith('HAIKU')) return { value: 'hk' };
+      return { value: '' };
+    }) as typeof inquirer.prompt;
+    try {
+      expect(await realPrompts.inputProfileField('token')).toBe('tok-XYZ');
+      expect(await realPrompts.inputProfileField('baseUrl', { defaultValue: 'd' })).toBe('https://x');
+      expect(await realPrompts.inputProfileField('sonnetModel')).toBe('sn');
+      expect(await realPrompts.inputProfileField('opusModel')).toBe('op');
+      expect(await realPrompts.inputProfileField('haikuModel')).toBe('hk');
+
+      // Each call should carry the schema's label as `message`.
+      const messages = calls.map((c) => String(c.message ?? ''));
+      expect(messages).toEqual([
+        'API Token',
+        'API Base URL',
+        'SONNET 模型',
+        'OPUS 模型',
+        'HAIKU 模型',
+      ]);
+
+      // The default (when supplied) and the schema validator (always)
+      // should be threaded through.
+      const baseUrlCall = calls[1];
+      expect(baseUrlCall.default).toBe('d');
+      expect(typeof baseUrlCall.validate).toBe('function');
+      // The schema validator accepts a valid URL, rejects invalid.
+      const validate = baseUrlCall.validate as (v: string) => true | string;
+      expect(validate('https://example.com')).toBe(true);
+      expect(validate('ftp://nope')).toBe('URL 必须以 http:// 或 https:// 开头');
+      expect(validate('   ')).toBe('URL 不能为空');
+    } finally {
+      inquirer.prompt = original;
+    }
   });
 });

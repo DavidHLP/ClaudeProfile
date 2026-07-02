@@ -15,12 +15,29 @@
  */
 import type { Profile, ProviderTemplate } from '../types/index.js';
 import type { EditableField } from '../types/command.js';
+import type { ProfileField } from '../domain/profileSchema.js';
+import { PROFILE_FIELDS } from '../domain/profileSchema.js';
 import * as prompt from '../ui/prompt.js';
 
 export interface Prompts {
   selectProvider(providers: ProviderTemplate[]): Promise<ProviderTemplate>;
   inputProfileName(defaultName: string): Promise<string>;
   promptForNewName(defaultName: string): Promise<string | null>;
+  /**
+   * Schema-backed per-field input prompt. Owns the per-field label
+   * and the input-time validator (`FieldSpec.validateInput`).
+   *
+   * Replaces the 5 hand-rolled `inputApiToken` / `inputBaseUrl` /
+   * `inputSonnetModel` / `inputOpusModel` / `inputHaikuModel` methods
+   * for the `create` and `edit` interactive paths. The per-field
+   * prompt methods below are preserved for back-compat with any
+   * embedder that depended on them; new code should call
+   * `inputProfileField` instead.
+   */
+  inputProfileField(
+    field: ProfileField,
+    options?: { defaultValue?: string }
+  ): Promise<string>;
   inputApiToken(): Promise<string>;
   inputBaseUrl(defaultValue?: string): Promise<string>;
   inputSonnetModel(defaultValue?: string): Promise<string>;
@@ -46,6 +63,14 @@ export const realPrompts: Prompts = {
   selectProvider: (providers) => prompt.selectProvider(providers),
   inputProfileName: (defaultName) => prompt.inputProfileName(defaultName),
   promptForNewName: (defaultName) => prompt.promptForNewName(defaultName),
+  inputProfileField: (field, options) => {
+    const spec = PROFILE_FIELDS[field];
+    return prompt.promptInput({
+      message: spec.label,
+      default: options?.defaultValue,
+      validate: spec.validateInput,
+    });
+  },
   inputApiToken: () => prompt.inputApiToken(),
   inputBaseUrl: (defaultValue) => prompt.inputBaseUrl(defaultValue),
   inputSonnetModel: (defaultValue) => prompt.inputSonnetModel(defaultValue),

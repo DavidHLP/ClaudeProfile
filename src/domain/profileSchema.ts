@@ -47,6 +47,8 @@
  *   4. Pure functions over the field/env shape:
  *        - `applyField(env, field, value)` — apply a field change
  *        - `getFieldValue(env, field)` — read the primary env value
+ *        - `defaultFieldValue(env, field, fallback)` — resolve a default
+ *          for the field from a base env (used to seed the create prompt)
  *        - `validateProfile(env)` — produce validation issues
  *        - `profileDetailRows(env, mask)` — produce the 6 display rows
  *
@@ -195,6 +197,33 @@ export const PROFILE_DISPLAY_ROWS: readonly DisplayRowSpec[] = [
 export function getFieldValue(env: EnvConfig, field: ProfileField): string | undefined {
   const primaryKey = PROFILE_FIELDS[field].envKeys[0];
   return primaryKey ? env[primaryKey] : undefined;
+}
+
+/**
+ * Resolve the default value for a field given a base env (e.g. a
+ * provider's `envTemplate`) and a provider-level fallback. Returns
+ * the base env's primary env value for the field if it is set;
+ * otherwise the fallback (which is also returned when the field
+ * has no primary env key, a theoretical case today but possible
+ * if a future field is purely synthetic).
+ *
+ * Single source of truth for "what's the default for field X when
+ * building a new profile from a template?" — replaces the previous
+ * `provider.envTemplate.ANTHROPIC_DEFAULT_SONNET_MODEL ||
+ * provider.defaultModel` dance in `createCommandInteractive`.
+ *
+ * Pure function — no I/O, no DI. The interface is the test surface.
+ */
+export function defaultFieldValue(
+  env: Partial<EnvConfig>,
+  field: ProfileField,
+  fallback?: string
+): string | undefined {
+  const primaryKey = PROFILE_FIELDS[field].envKeys[0];
+  if (primaryKey && env[primaryKey]) {
+    return env[primaryKey];
+  }
+  return fallback;
 }
 
 /**

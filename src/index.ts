@@ -87,6 +87,7 @@ export {
   SENSITIVE_ENV_KEYS,
   applyField,
   getFieldValue,
+  defaultFieldValue,
   validateProfile,
   profileDetailRows,
   maskProfileValue,

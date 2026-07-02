@@ -17,6 +17,20 @@ canonical union lives in `domain/profileSchema.ts` as `ProfileField`.
 The legacy `EditableField` type in `types/command.ts` is a back-compat
 alias for `ProfileField`.
 
+### Profile Field Prompt
+The schema-backed single entry point for collecting a `ProfileField`
+at the prompt layer. Exposed as `ctx.prompts.inputProfileField(field,
+options?)` on the `Prompts` interface. Owns: the per-field label
+(`FieldSpec.label`) and the input-time validator
+(`FieldSpec.validateInput`). Replaces the 5 hand-rolled
+`inputApiToken` / `inputBaseUrl` / `inputSonnetModel` / `inputOpusModel`
+/ `inputHaikuModel` methods on the interactive create/edit paths. The
+companion `defaultFieldValue(env, field, fallback)` schema helper is
+the canonical way to compute "what's the default for field X given a
+base env (e.g. a provider's `envTemplate`)?". **Interactive commands
+that collect a profile field go through this seam; the per-field
+prompt methods exist for back-compat only.**
+
 ### Profile Schema
 The canonical shape of a profile's first-class fields. Lives in
 `domain/profileSchema.ts`. Owns: the `PROFILE_FIELDS` map (env keys,

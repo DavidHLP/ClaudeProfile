@@ -8,6 +8,7 @@
  */
 import { getProviderById, materializeProfile, providerTemplates } from '../templates/providers.js';
 import { CreateProfileInput, CommandResult } from '../types/command.js';
+import { defaultFieldValue } from '../domain/profileSchema.js';
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
 
@@ -37,18 +38,25 @@ export async function createCommand(ctx: CommandContext, input: CreateProfileInp
 export async function createCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
   const provider = await ctx.prompts.selectProvider(providerTemplates);
   const profileName = await ctx.prompts.inputProfileName(provider.id);
-  const token = await ctx.prompts.inputApiToken();
-  const baseUrl = await ctx.prompts.inputBaseUrl(provider.defaultBaseUrl);
 
-  const sonnetModel = await ctx.prompts.inputSonnetModel(
-    provider.envTemplate.ANTHROPIC_DEFAULT_SONNET_MODEL || provider.defaultModel
-  );
-  const opusModel = await ctx.prompts.inputOpusModel(
-    provider.envTemplate.ANTHROPIC_DEFAULT_OPUS_MODEL || provider.defaultModel
-  );
-  const haikuModel = await ctx.prompts.inputHaikuModel(
-    provider.envTemplate.ANTHROPIC_DEFAULT_HAIKU_MODEL || provider.defaultModel
-  );
+  // Defaults come from the provider template, falling back to the
+  // provider-level `defaultModel` (for the 3 model slots) or
+  // `defaultBaseUrl` (for baseUrl). The schema's `defaultFieldValue`
+  // owns the "which env key is the primary for field X" knowledge;
+  // this command no longer reaches into env-key names directly.
+  const token = await ctx.prompts.inputProfileField('token');
+  const baseUrl = await ctx.prompts.inputProfileField('baseUrl', {
+    defaultValue: defaultFieldValue(provider.envTemplate, 'baseUrl', provider.defaultBaseUrl),
+  });
+  const sonnetModel = await ctx.prompts.inputProfileField('sonnetModel', {
+    defaultValue: defaultFieldValue(provider.envTemplate, 'sonnetModel', provider.defaultModel),
+  });
+  const opusModel = await ctx.prompts.inputProfileField('opusModel', {
+    defaultValue: defaultFieldValue(provider.envTemplate, 'opusModel', provider.defaultModel),
+  });
+  const haikuModel = await ctx.prompts.inputProfileField('haikuModel', {
+    defaultValue: defaultFieldValue(provider.envTemplate, 'haikuModel', provider.defaultModel),
+  });
 
   return createCommand(ctx, {
     providerId: provider.id,

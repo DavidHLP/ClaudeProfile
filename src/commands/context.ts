@@ -99,6 +99,7 @@ export const noopPrompts: Prompts = {
   selectProvider: async () => ({ id: 'custom', name: 'Custom', description: '', defaultBaseUrl: '', defaultModel: '', envTemplate: {} } as ProviderTemplate),
   inputProfileName: async () => '',
   promptForNewName: async () => null,
+  inputProfileField: async () => '',
   inputApiToken: async () => '',
   inputBaseUrl: async () => '',
   inputSonnetModel: async () => '',

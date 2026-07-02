@@ -27,44 +27,22 @@ export async function editCommand(ctx: CommandContext, input: EditProfileInput):
 
 /**
  * Prompt the user for the new value of a specific editable field,
- * using the existing env value (if any) as the default. Pulled out
- * of the interactive command so the same logic is shared with any
- * future batch-edit / scripted path without touching the run/select
- * flow.
- */
-/**
- * Prompt the user for the new value of a specific editable field,
- * using the existing env value (if any) as the default. Reads the
- * field's current value via `getFieldValue` from the schema, so the
- * "which env key is the primary for field X" knowledge lives in
- * exactly one place.
+ * using the existing env value (if any) as the default.
+ *
+ * The `field` dispatch is owned by the schema's `inputProfileField`
+ * (via `ctx.prompts`). The schema provides the per-field label and
+ * the input-time validator; `getFieldValue` provides the current
+ * value as the default. This helper is the single bridge between
+ * the edit command and the schema-backed prompt surface.
  */
 async function promptForEditableField(
   ctx: CommandContext,
   profile: { env: EnvConfig },
   field: EditableField
 ): Promise<string> {
-  const env = profile.env;
-  const current = getFieldValue(env, field);
-  // The schema still owns the per-field prompt choice. We branch on
-  // `field` here because each prompt method enforces a different
-  // shape (e.g. `inputApiToken` has no default, the model prompts
-  // have string defaults) — collapsing to a single generic would
-  // require extending the `Prompts` interface, which is out of
-  // scope for this deepening. The point of the schema is to
-  // consolidate the *env* shape; the prompt surface stays separate.
-  switch (field) {
-    case 'token':
-      return ctx.prompts.inputApiToken();
-    case 'baseUrl':
-      return ctx.prompts.inputBaseUrl(current);
-    case 'sonnetModel':
-      return ctx.prompts.inputSonnetModel(current);
-    case 'opusModel':
-      return ctx.prompts.inputOpusModel(current);
-    case 'haikuModel':
-      return ctx.prompts.inputHaikuModel(current);
-  }
+  return ctx.prompts.inputProfileField(field, {
+    defaultValue: getFieldValue(profile.env, field),
+  });
 }
 
 export async function editCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
