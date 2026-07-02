@@ -2,35 +2,19 @@ import { RenameProfileInput, CommandResult } from '../types/command.js';
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
 import { runProfileAction, CancelledError } from './interactiveSession.js';
-import { ProfileAlreadyExistsError } from '../errors.js';
 
 export async function renameCommand(ctx: CommandContext, input: RenameProfileInput): Promise<CommandResult> {
   return runCommand('重命名配置', async () => {
-    // Get the old profile
-    const oldProfile = ctx.profiles.getProfile(input.oldName);
+    // The "derive a new profile from an existing one" core lives on
+    // the service (`cloneProfile` — see ADR-0012). Rename-specific
+    // concerns — re-pointing the active marker, deleting the source —
+    // stay here because they are not part of "what does a clone do".
+    ctx.profiles.cloneProfile(input.oldName, input.newName);
 
-    // Check if new name already exists
-    if (ctx.profiles.profileExists(input.newName)) {
-      throw new ProfileAlreadyExistsError(input.newName);
-    }
-
-    // Create new profile with new name but same env
-    const newProfile = {
-      name: input.newName,
-      description: oldProfile.description,
-      env: { ...oldProfile.env },
-    };
-
-    // Save new profile
-    ctx.profiles.saveProfile(newProfile);
-
-    // If this was the current profile, update the reference
-    const currentProfile = ctx.profiles.getCurrentProfile();
-    if (currentProfile === input.oldName) {
+    if (ctx.profiles.getCurrentProfile() === input.oldName) {
       ctx.profiles.setCurrentProfile(input.newName);
     }
 
-    // Delete old profile
     ctx.profiles.deleteProfile(input.oldName);
 
     return { success: true, output: ctx.env.formatRenameSuccess(input.oldName, input.newName) };

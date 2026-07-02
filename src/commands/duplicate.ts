@@ -2,27 +2,14 @@ import { DuplicateProfileInput, CommandResult } from '../types/command.js';
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
 import { runProfileAction, CancelledError } from './interactiveSession.js';
-import { ProfileAlreadyExistsError } from '../errors.js';
 
 export async function duplicateCommand(ctx: CommandContext, input: DuplicateProfileInput): Promise<CommandResult> {
   return runCommand('复制配置', async () => {
-    // Get the source profile
-    const sourceProfile = ctx.profiles.getProfile(input.sourceName);
-
-    // Check if new name already exists
-    if (ctx.profiles.profileExists(input.newName)) {
-      throw new ProfileAlreadyExistsError(input.newName);
-    }
-
-    // Create new profile with new name but same env and description
-    const newProfile = {
-      name: input.newName,
-      description: sourceProfile.description,
-      env: { ...sourceProfile.env },
-    };
-
-    // Save new profile
-    ctx.profiles.saveProfile(newProfile);
+    // The whole command is now a single delegation to the
+    // `cloneProfile` seam (ADR-0012). The existence check, the env
+    // spread, and the description copy are no longer the command's
+    // problem — they live on the service.
+    ctx.profiles.cloneProfile(input.sourceName, input.newName);
 
     return { success: true, output: ctx.env.formatDuplicateSuccess(input.sourceName, input.newName) };
   });

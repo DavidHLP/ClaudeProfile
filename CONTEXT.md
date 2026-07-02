@@ -285,6 +285,27 @@ whitespace-only values are kept (the shell is the source of
 truth). **The `startsWith('ANTHROPIC_')` / `startsWith('CLAUDE_CODE_')`
 iteration is never duplicated outside `extractClaudeShellEnv`.**
 
+### Profile Clone
+The "derive a new profile from an existing one" operation. Lives on
+`ProfileService` as `cloneProfile(sourceName, newName): void` and
+materializes a new profile under `newName` whose `description` and
+`env` are an independent copy of `sourceName`. Throws
+`ProfileNotFoundError` when the source is missing and
+`ProfileAlreadyExistsError` when the target name is already taken
+(including the degenerate `source === target` case). The env spread
+is shallow; `EnvConfig` is a flat `Record<string, string>`, so a
+shallow copy is the correct deep copy. If `Profile` ever gains a
+non-string field, the env-spread line in `cloneProfile` is the
+single place to revisit.
+
+`renameCommand` and `duplicateCommand` are the only callers. Both
+collapse to a single line: `ctx.profiles.cloneProfile(...)`.
+Rename-specific concerns (re-pointing the active marker, deleting
+the source) stay in `renameCommand` because they are not part of
+"what does a clone do." **The "build a new profile object from an
+existing one" pattern has exactly one home; commands never inline
+the existence check + object construction + `saveProfile` triplet.**
+
 ## Vocabulary discipline
 
 - Say **"Profile"**, not "config file" or "preset" or "account."
