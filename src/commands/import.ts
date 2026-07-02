@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envPresenter.js';
+import { envPresenter } from '../presenters/envRenderer.js';
 import { ImportProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { FileOperationError, ProfileAlreadyExistsError, AppError } from '../errors.js';

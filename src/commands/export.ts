@@ -1,6 +1,7 @@
 import { writeFileSync } from 'fs';
 import { profileService } from '../services/profileService.js';
-import { envPresenter, buildExportCommands, buildSwitchCommands, buildExportJson, buildSwitchJson } from '../presenters/envPresenter.js';
+import { envPresenter } from '../presenters/envRenderer.js';
+import { buildExportCommands, buildSwitchCommands, buildExportJson, buildSwitchJson } from '../engine/envDiff.js';
 import { CommandResult, ExportFileInput } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { resolveOldEnv } from '../engine/activation.js';

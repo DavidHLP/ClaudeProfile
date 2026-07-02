@@ -1,5 +1,5 @@
 import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envPresenter.js';
+import { envPresenter } from '../presenters/envRenderer.js';
 import { RenameProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { ProfileAlreadyExistsError } from '../errors.js';

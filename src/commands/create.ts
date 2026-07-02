@@ -1,7 +1,7 @@
 import { Profile, EnvConfig } from '../types/index.js';
 import { providerTemplates, getProviderById } from '../templates/providers.js';
 import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envPresenter.js';
+import { envPresenter } from '../presenters/envRenderer.js';
 import { CreateProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 

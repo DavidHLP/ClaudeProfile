@@ -3,7 +3,7 @@ import type { Stats } from 'fs';
 import { mkdirSync, existsSync, readdirSync, statSync } from 'fs';
 import { dirname } from 'path';
 import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envPresenter.js';
+import { envPresenter } from '../presenters/envRenderer.js';
 import { BackupConfigInput, RestoreConfigInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { FileOperationError, AppError } from '../errors.js';

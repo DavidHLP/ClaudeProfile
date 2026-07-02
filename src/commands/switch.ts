@@ -1,5 +1,6 @@
 import { profileService } from '../services/profileService.js';
-import { envPresenter, buildSwitchCommands } from '../presenters/envPresenter.js';
+import { envPresenter } from '../presenters/envRenderer.js';
+import { buildSwitchCommands } from '../engine/envDiff.js';
 import { SwitchProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { resolveOldEnv } from '../engine/activation.js';

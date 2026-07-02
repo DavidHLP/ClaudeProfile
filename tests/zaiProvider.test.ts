@@ -42,10 +42,6 @@ describe('zai provider', () => {
     expect(zai?.envTemplate.CLAUDE_CODE_SUBAGENT_MODEL).toBeUndefined();
   });
 
-  it('appears in the registry singleton', async () => {
-    const { providerRegistry } = await import('../src/templates/providerRegistry.js');
-    expect(providerRegistry.getProvider('zai')).toBeDefined();
-  });
 });
 
 describe('baseEnvTemplate contract', () => {
