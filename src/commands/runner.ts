@@ -1,7 +1,11 @@
 import { AppError } from '../errors.js';
 import { CommandResult } from '../types/command.js';
+import { CancelledError } from './interactiveSession.js';
 
-export function toCommandResult(err: unknown, operation: string): { success: false; error: string } {
+export function toCommandResult(err: unknown, operation: string): CommandResult {
+  if (err instanceof CancelledError) {
+    return { success: false, error: err.message, wasCancelled: true };
+  }
   if (err instanceof AppError) {
     return { success: false, error: err.message };
   }

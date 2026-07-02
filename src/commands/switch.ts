@@ -1,8 +1,9 @@
 import { buildSwitchCommands } from '../engine/envDiff.js';
 import { SwitchProfileInput, CommandResult } from '../types/command.js';
 import { resolveOldEnv } from '../engine/activation.js';
-import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
+import type { CommandContext } from './context.js';
+import { runProfileAction } from './interactiveSession.js';
 
 export async function switchCommand(ctx: CommandContext, input: SwitchProfileInput): Promise<CommandResult> {
   return runCommand('切换配置', async () => {
@@ -31,29 +32,35 @@ export async function switchCommand(ctx: CommandContext, input: SwitchProfileInp
 }
 
 export async function switchCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
+  // Pre-flight: 0 profiles is its own message (and doesn't need the banner).
   const profiles = ctx.profiles.listProfiles();
   if (profiles.length === 0) {
     return { success: false, error: '没有可用的配置。请先使用 create 命令创建配置。' };
   }
 
+  // Shortcut: only one profile, and it's already the current one.
+  // We just delegate to `switchCommand` (the banner is the right
+  // user-facing signal that "nothing changed" because the env diff
+  // is empty).
   const currentProfile = ctx.profiles.getCurrentProfile();
-
-  // 输出 banner
-  console.log(ctx.env.formatBanner());
-
-  // 如果只有一个配置且已是当前配置，无需操作
   if (profiles.length === 1 && profiles[0].name === currentProfile) {
     return switchCommand(ctx, { profileName: currentProfile! });
   }
 
-  const selectedName = await ctx.prompts.selectProfileFromList(profiles, currentProfile);
+  // TTY banner is part of the interactive UX; the standard flow
+  // would otherwise just show the "select profile" prompt.
+  console.log(ctx.env.formatBanner());
 
-  if (!selectedName) {
-    return { success: false, error: '已取消切换。', wasCancelled: true };
-  }
-
-  // Save old profile name for diff in export --current
-  ctx.profiles.setPreviousProfile(currentProfile);
-
-  return switchCommand(ctx, { profileName: selectedName });
+  return runProfileAction<SwitchProfileInput>(ctx, {
+    verb: '切换',
+    emptyMessage: '没有可用的配置。请先使用 create 命令创建配置。',
+    buildInput: (selected) => {
+      // Save the old profile name so `export --current` can diff against it
+      // on the next call. `switchCommand` itself does not touch the
+      // previous-profile marker; only this interactive entry does.
+      ctx.profiles.setPreviousProfile(currentProfile);
+      return { profileName: selected.name };
+    },
+    execute: switchCommand,
+  });
 }

@@ -90,6 +90,19 @@ A `*Interactive` variant of a command that uses `ctx.prompts` to gather
 its input from the user via inquirer. The non-interactive variant is
 the same command with a programmatic input DTO.
 
+### Interactive Session
+The "select a profile, build the input, optionally confirm, then
+execute" shape shared by most `*Interactive` commands. Lives in
+`commands/interactiveSession.ts` as the `runProfileAction` higher-order
+function and a `ProfileActionFlow` descriptor. **Every `*Interactive`
+command that operates on a profile should compose this flow rather
+than re-implementing the list/empty/select/confirm/return-cancelled
+sequence by hand.** The session understands one cancellation
+primitive — `CancelledError` — and converts it to a uniform
+`{ success: false, wasCancelled: true }` result; `runner.toCommandResult`
+honors the same primitive so `runCommand`-wrapped code can throw it
+without losing the `wasCancelled` flag.
+
 ## Vocabulary discipline
 
 - Say **"Profile"**, not "config file" or "preset" or "account."

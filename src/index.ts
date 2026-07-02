@@ -78,3 +78,11 @@ export {
 
 // ── Profile materialization (template → env merge) ─────────────────────
 export { materializeProfile } from './templates/providers.js';
+
+// ── Interactive session (select-profile / confirm / execute flow) ───
+export {
+  runProfileAction,
+  CancelledError,
+  type ProfileActionFlow,
+  type ConfirmMessage,
+} from './commands/interactiveSession.js';
