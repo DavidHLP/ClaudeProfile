@@ -88,8 +88,15 @@ describe('validateCommand', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should warn when current profile is missing model', async () => {
-      store.saveProfile(createProfile({ ANTHROPIC_MODEL: '' }));
+    it('should warn when current profile is missing all model slots', async () => {
+      // The schema treats SONNET as a single field backed by two env
+      // keys (ANTHROPIC_DEFAULT_SONNET_MODEL + ANTHROPIC_MODEL). The
+      // field is "set" if ANY of its env keys has a value, so to
+      // trigger a warning we must clear both.
+      store.saveProfile(createProfile({
+        ANTHROPIC_MODEL: '',
+        ANTHROPIC_DEFAULT_SONNET_MODEL: '',
+      }));
       ctx.profiles.setCurrentProfile('test-profile');
       const { validateCommand } = await import('../src/commands/validate.js');
       const result = await validateCommand(ctx);
@@ -97,6 +104,7 @@ describe('validateCommand', () => {
       // Warnings are non-fatal — success stays true
       expect(result.success).toBe(true);
       if (result.success) {
+        expect(result.output).toContain('ANTHROPIC_DEFAULT_SONNET_MODEL');
         expect(result.output).toContain('ANTHROPIC_MODEL');
       }
     });

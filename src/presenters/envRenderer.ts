@@ -11,6 +11,7 @@
 import { EnvConfig, Profile } from '../types/index.js';
 import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
 import { theme, icon, padVisualEnd, box } from '../ui/theme.js';
+import { profileDetailRows, maskProfileValue } from '../domain/profileSchema.js';
 
 export interface EnvPresenter {
   formatBanner(): string;
@@ -176,18 +177,14 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
   formatProfileDetail(profile: Profile, isCurrent: boolean): string {
     const marker = isCurrent ? icon.active : icon.standby;
     const nameLine = `  ${marker} ${isCurrent ? theme.bold(profile.name) : profile.name} (${profile.description || '无描述'})`;
-    const env = profile.env;
-    const rows: Array<[string, string]> = [
-      ['BASE URL', env.ANTHROPIC_BASE_URL || '未设置'],
-      ['TOKEN', env.ANTHROPIC_AUTH_TOKEN ? '已设置' : '未设置'],
-      ['MODEL', env.ANTHROPIC_MODEL || '未设置'],
-      ['SONNET', env.ANTHROPIC_DEFAULT_SONNET_MODEL || '未设置'],
-      ['OPUS', env.ANTHROPIC_DEFAULT_OPUS_MODEL || '未设置'],
-      ['HAIKU', env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '未设置'],
-    ];
+    // The 6 detail rows are derived from the profile schema, so the
+    // order, the short labels, and the "sensitive → 已设置" convention
+    // live in exactly one place. `maskProfileValue` enforces the
+    // mask policy for the token row.
+    const rows = profileDetailRows(profile.env, maskProfileValue);
     const lines: string[] = [nameLine];
-    for (const [label, value] of rows) {
-      lines.push(`    ${theme.dim(label + ':')} ${value}`);
+    for (const row of rows) {
+      lines.push(`    ${theme.dim(row.shortLabel + ':')} ${row.displayValue}`);
     }
     return lines.join('\n');
   }

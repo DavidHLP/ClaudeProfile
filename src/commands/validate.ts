@@ -1,98 +1,20 @@
 import { CommandResult } from '../types/command.js';
 import { Profile } from '../types/index.js';
 import type { CommandContext } from './context.js';
+import { validateProfile, ValidationIssue as SchemaIssue } from '../domain/profileSchema.js';
 
 export interface ValidateOptions {
   verbose?: boolean;
 }
 
-interface ValidationIssue {
+/**
+ * The legacy `ValidationIssue` shape kept the `profile` field attached
+ * to each issue (set by the command when iterating profiles). The
+ * schema's issue is profile-free by design (it's a pure function over
+ * env), so we adapt it here.
+ */
+interface ValidationIssue extends SchemaIssue {
   profile: string;
-  field: string;
-  message: string;
-  severity: 'error' | 'warning';
-}
-
-function validateProfile(profile: Profile, _isCurrentProfile: boolean): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-
-  // Check required fields
-  if (!profile.env.ANTHROPIC_AUTH_TOKEN || profile.env.ANTHROPIC_AUTH_TOKEN.trim() === '') {
-    issues.push({
-      profile: profile.name,
-      field: 'ANTHROPIC_AUTH_TOKEN',
-      message: 'API Token 为空',
-      severity: 'error',
-    });
-  }
-
-  if (!profile.env.ANTHROPIC_BASE_URL || profile.env.ANTHROPIC_BASE_URL.trim() === '') {
-    issues.push({
-      profile: profile.name,
-      field: 'ANTHROPIC_BASE_URL',
-      message: 'Base URL 为空',
-      severity: 'error',
-    });
-  } else {
-    // Validate URL format
-    try {
-      const url = new URL(profile.env.ANTHROPIC_BASE_URL);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        issues.push({
-          profile: profile.name,
-          field: 'ANTHROPIC_BASE_URL',
-          message: 'URL 格式无效（仅支持 http/https）',
-          severity: 'error',
-        });
-      }
-    } catch {
-      issues.push({
-        profile: profile.name,
-        field: 'ANTHROPIC_BASE_URL',
-        message: 'URL 格式无效',
-        severity: 'error',
-      });
-    }
-  }
-
-  // Warnings for recommended fields
-  if (!profile.env.ANTHROPIC_MODEL || profile.env.ANTHROPIC_MODEL.trim() === '') {
-    issues.push({
-      profile: profile.name,
-      field: 'ANTHROPIC_MODEL',
-      message: '未设置默认模型',
-      severity: 'warning',
-    });
-  }
-
-  if (!profile.env.ANTHROPIC_DEFAULT_SONNET_MODEL || profile.env.ANTHROPIC_DEFAULT_SONNET_MODEL.trim() === '') {
-    issues.push({
-      profile: profile.name,
-      field: 'ANTHROPIC_DEFAULT_SONNET_MODEL',
-      message: '未设置 SONNET 模型',
-      severity: 'warning',
-    });
-  }
-
-  if (!profile.env.ANTHROPIC_DEFAULT_OPUS_MODEL || profile.env.ANTHROPIC_DEFAULT_OPUS_MODEL.trim() === '') {
-    issues.push({
-      profile: profile.name,
-      field: 'ANTHROPIC_DEFAULT_OPUS_MODEL',
-      message: '未设置 OPUS 模型',
-      severity: 'warning',
-    });
-  }
-
-  if (!profile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || profile.env.ANTHROPIC_DEFAULT_HAIKU_MODEL.trim() === '') {
-    issues.push({
-      profile: profile.name,
-      field: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-      message: '未设置 HAIKU 模型',
-      severity: 'warning',
-    });
-  }
-
-  return issues;
 }
 
 export async function validateCommand(ctx: CommandContext, options: ValidateOptions = {}): Promise<CommandResult> {
@@ -108,13 +30,14 @@ export async function validateCommand(ctx: CommandContext, options: ValidateOpti
   }
 
   for (const profile of profiles) {
-    const isCurrent = profile.name === currentProfile;
-    const issues = validateProfile(profile, isCurrent);
-    allIssues.push(...issues);
+    const issues = validateProfile(profile.env);
+    for (const issue of issues) {
+      allIssues.push({ ...issue, profile: profile.name });
+    }
   }
 
-  const errors = allIssues.filter(i => i.severity === 'error');
-  const warnings = allIssues.filter(i => i.severity === 'warning');
+  const errors = allIssues.filter((i) => i.severity === 'error');
+  const warnings = allIssues.filter((i) => i.severity === 'warning');
 
   const lines: string[] = [];
 
@@ -145,14 +68,14 @@ export async function validateCommand(ctx: CommandContext, options: ValidateOpti
   if (errors.length > 0) {
     lines.push(`❌ 发现 ${errors.length} 个错误:`);
     for (const issue of errors) {
-      lines.push(`  • [${issue.profile}] ${issue.field}: ${issue.message}`);
+      lines.push(`  • [${issue.profile}] ${issue.envKey}: ${issue.message}`);
     }
   }
 
   if (warnings.length > 0) {
     lines.push(`⚠️  发现 ${warnings.length} 个警告:`);
     for (const issue of warnings) {
-      lines.push(`  • [${issue.profile}] ${issue.field}: ${issue.message}`);
+      lines.push(`  • [${issue.profile}] ${issue.envKey}: ${issue.message}`);
     }
   }
 

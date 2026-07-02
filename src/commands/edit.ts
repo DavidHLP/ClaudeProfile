@@ -3,23 +3,18 @@ import { EditableField, EditProfileInput, CommandResult } from '../types/command
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
 import { runProfileAction, CancelledError } from './interactiveSession.js';
-
-const FIELD_TO_ENV_KEYS: Record<EditableField, readonly (keyof EnvConfig)[]> = {
-  token: ['ANTHROPIC_AUTH_TOKEN'],
-  baseUrl: ['ANTHROPIC_BASE_URL'],
-  sonnetModel: ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL'],
-  opusModel: ['ANTHROPIC_DEFAULT_OPUS_MODEL'],
-  haikuModel: ['ANTHROPIC_DEFAULT_HAIKU_MODEL'],
-};
+import { applyField, getFieldValue, PROFILE_FIELDS } from '../domain/profileSchema.js';
 
 export async function editCommand(ctx: CommandContext, input: EditProfileInput): Promise<CommandResult> {
   return runCommand('编辑配置', async () => {
     const profile = ctx.profiles.getProfile(input.profileName);
 
-    const nextEnv: EnvConfig = { ...profile.env };
-    for (const key of FIELD_TO_ENV_KEYS[input.field]) {
-      nextEnv[key] = input.value;
-    }
+    // `applyField` writes to every env key the field owns (e.g. SONNET
+    // writes to both `ANTHROPIC_DEFAULT_SONNET_MODEL` and the legacy
+    // `ANTHROPIC_MODEL`). The schema is the single source of truth for
+    // which env keys each field controls; this command no longer
+    // duplicates that mapping.
+    const nextEnv = applyField(profile.env, input.field, input.value);
 
     ctx.profiles.saveProfile({ ...profile, env: nextEnv });
 
@@ -37,23 +32,38 @@ export async function editCommand(ctx: CommandContext, input: EditProfileInput):
  * future batch-edit / scripted path without touching the run/select
  * flow.
  */
+/**
+ * Prompt the user for the new value of a specific editable field,
+ * using the existing env value (if any) as the default. Reads the
+ * field's current value via `getFieldValue` from the schema, so the
+ * "which env key is the primary for field X" knowledge lives in
+ * exactly one place.
+ */
 async function promptForEditableField(
   ctx: CommandContext,
   profile: { env: EnvConfig },
   field: EditableField
 ): Promise<string> {
   const env = profile.env;
+  const current = getFieldValue(env, field);
+  // The schema still owns the per-field prompt choice. We branch on
+  // `field` here because each prompt method enforces a different
+  // shape (e.g. `inputApiToken` has no default, the model prompts
+  // have string defaults) — collapsing to a single generic would
+  // require extending the `Prompts` interface, which is out of
+  // scope for this deepening. The point of the schema is to
+  // consolidate the *env* shape; the prompt surface stays separate.
   switch (field) {
     case 'token':
       return ctx.prompts.inputApiToken();
     case 'baseUrl':
-      return ctx.prompts.inputBaseUrl(env.ANTHROPIC_BASE_URL);
+      return ctx.prompts.inputBaseUrl(current);
     case 'sonnetModel':
-      return ctx.prompts.inputSonnetModel(env.ANTHROPIC_DEFAULT_SONNET_MODEL || env.ANTHROPIC_MODEL);
+      return ctx.prompts.inputSonnetModel(current);
     case 'opusModel':
-      return ctx.prompts.inputOpusModel(env.ANTHROPIC_DEFAULT_OPUS_MODEL);
+      return ctx.prompts.inputOpusModel(current);
     case 'haikuModel':
-      return ctx.prompts.inputHaikuModel(env.ANTHROPIC_DEFAULT_HAIKU_MODEL);
+      return ctx.prompts.inputHaikuModel(current);
   }
 }
 

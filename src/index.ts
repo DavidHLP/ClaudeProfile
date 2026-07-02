@@ -76,8 +76,26 @@ export {
   type Prompts,
 } from './commands/context.js';
 
-// ── Profile materialization (template → env merge) ─────────────────────
+// ── Profile materialization (template → env merge) ───
 export { materializeProfile } from './templates/providers.js';
+
+// ── Profile schema (canonical shape of first-class fields) ───
+export {
+  PROFILE_FIELDS,
+  PROFILE_FIELDS_ORDER,
+  PROFILE_DISPLAY_ROWS,
+  SENSITIVE_ENV_KEYS,
+  applyField,
+  getFieldValue,
+  validateProfile,
+  profileDetailRows,
+  maskProfileValue,
+  type ProfileField,
+  type FieldSpec,
+  type DisplayRowSpec,
+  type ValidationIssue,
+  type DetailRow,
+} from './domain/profileSchema.js';
 
 // ── Interactive session (select-profile / confirm / execute flow) ───
 export {

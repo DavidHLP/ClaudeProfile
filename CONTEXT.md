@@ -10,6 +10,31 @@ A named bundle of API credentials and configuration that the user can
 "switch into." Persisted as `<config-dir>/<name>.json`. Owned by the
 `Profile` type and the `ProfileService` interface.
 
+### Profile Field
+One of the 5 first-class keys a profile exposes to the user:
+`baseUrl`, `token`, `sonnetModel`, `opusModel`, `haikuModel`. The
+canonical union lives in `domain/profileSchema.ts` as `ProfileField`.
+The legacy `EditableField` type in `types/command.ts` is a back-compat
+alias for `ProfileField`.
+
+### Profile Schema
+The canonical shape of a profile's first-class fields. Lives in
+`domain/profileSchema.ts`. Owns: the `PROFILE_FIELDS` map (env keys,
+label, required flag, sensitive flag, prompt-time validator per
+field), the `PROFILE_DISPLAY_ROWS` list (the 6-row detail panel),
+and the pure functions `applyField`, `getFieldValue`, `validateProfile`,
+`profileDetailRows`, `maskProfileValue`. **All commands and
+presenters go through the schema; the "5-field shape" is never
+duplicated outside it.**
+
+### Profile Field → Env Key Mapping
+A field may own one or two env keys. The SONNET field owns both
+`ANTHROPIC_DEFAULT_SONNET_MODEL` (the slot override, primary) and
+the legacy `ANTHROPIC_MODEL`. `applyField` writes to every env key
+the field owns; `getFieldValue` reads the primary. Other fields
+own a single env key (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`,
+`ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`).
+
 ### Profile Service
 The seam that abstracts profile persistence. `ProfileService` is the
 interface; `ProfileServiceImpl` is the default in-memory + filesystem
@@ -110,5 +135,11 @@ without losing the `wasCancelled` flag.
 - Say **"eval bridge"** or **"shell hook"**, not "the magic script."
 - Say **"materialize"** when going from `ProviderTemplate + credentials`
   to a complete `Profile`.
+- Say **"Profile Field"** (one of the 5 first-class fields), not
+  "env key" or "config field" — `EnvConfig` is a flat dict and not
+  every env key is a field.
+- Say **"apply"** (`applyField`) when writing a field's value into an
+  env, and **"validate"** (`validateProfile`) when checking an env
+  for issues.
 - Say **"Provider Template"**, not "provider" alone (a `Provider` is
   an upstream service; a `ProviderTemplate` is a preset for one).

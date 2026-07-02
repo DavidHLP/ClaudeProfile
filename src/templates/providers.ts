@@ -1,6 +1,7 @@
 import type { Profile, EnvConfig } from '../types/index.js';
 import { ProviderTemplate } from '../types/index.js';
 import { baseEnvTemplate } from './baseEnvTemplate.js';
+import { applyField } from '../domain/profileSchema.js';
 
 export const providerTemplates: ProviderTemplate[] = [
   {
@@ -135,15 +136,16 @@ export function materializeProfile(
   },
   profileName: string
 ): Profile {
-  const env: EnvConfig = {
-    ...provider.envTemplate,
-    ANTHROPIC_BASE_URL: input.baseUrl,
-    ANTHROPIC_AUTH_TOKEN: input.token,
-    ANTHROPIC_MODEL: input.sonnetModel,
-    ANTHROPIC_DEFAULT_SONNET_MODEL: input.sonnetModel,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: input.opusModel,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: input.haikuModel,
-  };
+  // Field-by-field application: each `applyField` call writes to every
+  // env key the field owns, so the SONNET slot also updates the legacy
+  // `ANTHROPIC_MODEL` env key in lock-step. The schema is the single
+  // source of truth for which env keys each field controls.
+  let env: EnvConfig = { ...provider.envTemplate };
+  env = applyField(env, 'baseUrl', input.baseUrl);
+  env = applyField(env, 'token', input.token);
+  env = applyField(env, 'sonnetModel', input.sonnetModel);
+  env = applyField(env, 'opusModel', input.opusModel);
+  env = applyField(env, 'haikuModel', input.haikuModel);
 
   return {
     name: profileName,
