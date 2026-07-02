@@ -13,17 +13,24 @@
  * interface at once. Individual function re-exports would force tests
  * to mock one function at a time and to import the module.
  *
- * Note on the per-field prompt methods
- * -----------------------------------
- * ADR-0003 preserved the 5 hand-rolled `inputApiToken` / `inputBaseUrl` /
- * `inputSonnetModel` / `inputOpusModel` / `inputHaikuModel` methods on
- * `Prompts` "for back-compat with any external embedder that depended
- * on them." Since this is a CLI with no embedders (and the create /
- * edit paths use `inputProfileField` exclusively), the 5 shims have
- * been removed from the `Prompts` interface. The underlying functions
- * still exist as top-level exports of `ui/prompt.ts` for any future
- * embedder that wants them — they are simply no longer part of the
- * command-facing seam.
+ * Historical note
+ * ---------------
+ * The 5 hand-rolled `inputApiToken` / `inputBaseUrl` /
+ * `inputSonnetModel` / `inputOpusModel` / `inputHaikuModel` methods
+ * were removed from this interface in ADR-0009, then removed from
+ * `ui/prompt.ts` itself in this deepening (the deletion test
+ * confirmed nothing in the codebase called them once the `Prompts`
+ * interface stopped exposing them).
+ *
+ * The `selectProfileFromList` method was also removed in this
+ * deepening. Its responsibility — the rich profile choice formatting
+ * (icon + name + provider + token marker) — is now owned by
+ * `commands/interactiveSession.ts#defaultProfileChoice`, wired into
+ * `runProfileAction` automatically. The previous hand-rolled copy in
+ * `ui/prompt.ts` returned a `string | null` (the profile name) and
+ * forced callers to re-derive the full `Profile` object from the
+ * name; the deepening returns the `Profile` directly through the
+ * `runSelectableAction` seam.
  */
 import type { Profile, ProviderTemplate } from '../types/index.js';
 import type { EditableField } from '../types/command.js';
@@ -41,16 +48,14 @@ export interface Prompts {
    *
    * Replaces the 5 hand-rolled `inputApiToken` / `inputBaseUrl` /
    * `inputSonnetModel` / `inputOpusModel` / `inputHaikuModel` methods
-   * for the `create` and `edit` interactive paths. The per-field
-   * prompt functions below are still available as top-level exports
-   * of `ui/prompt.ts` for any embedder; new code should call
-   * `inputProfileField` instead.
+   * that used to live here. The 5 functions themselves were deleted
+   * from `ui/prompt.ts` after the deepening's deletion test
+   * confirmed nothing in the codebase still called them.
    */
   inputProfileField(
     field: ProfileField,
     options?: { defaultValue?: string }
   ): Promise<string>;
-  selectProfileFromList(profiles: Profile[], currentProfile: string | null): Promise<string | null>;
   selectEditField(profile: Profile): Promise<EditableField | null>;
   selectBackup(backups: { name: string; path: string; date: Date }[]): Promise<string | null>;
   confirmAction(message: string): Promise<boolean>;
@@ -78,7 +83,6 @@ export const realPrompts: Prompts = {
       validate: spec.validateInput,
     });
   },
-  selectProfileFromList: (profiles, currentProfile) => prompt.selectProfileFromList(profiles, currentProfile),
   selectEditField: (profile) => prompt.selectEditField(profile),
   selectBackup: (backups) => prompt.selectBackup(backups),
   confirmAction: (message) => prompt.confirmAction(message),

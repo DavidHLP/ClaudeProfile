@@ -86,7 +86,7 @@ export async function restoreCommandInteractive(ctx: CommandContext, backupPath?
     },
     currentKey: () => null,
     confirm: (path) => `确定要从备份 '${path.split('/').pop()}' 恢复吗？\n${ctx.env.formatWarning('当前配置目录中的文件将被覆盖。')}`,
-    buildInput: (path) => ({ backupPath: path }),
+    buildInput: async (path) => ({ backupPath: path }),
     execute: restoreCommand,
   }).catch((err) => {
     if (err instanceof CancelledError) {

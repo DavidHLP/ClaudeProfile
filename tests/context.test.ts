@@ -14,11 +14,6 @@ import { noopPrompts, realPrompts, type CommandContext, createTestContext } from
 
 describe('CommandContext', () => {
   describe('noopPrompts', () => {
-    it('returns null for selectProfileFromList', async () => {
-      const result = await noopPrompts.selectProfileFromList([], null);
-      expect(result).toBeNull();
-    });
-
     it('returns null for selectEditField', async () => {
       const profile: Profile = {
         name: 'p',
@@ -75,7 +70,6 @@ describe('CommandContext', () => {
         'inputProfileName',
         'promptForNewName',
         'inputProfileField',
-        'selectProfileFromList',
         'selectEditField',
         'selectBackup',
         'confirmAction',

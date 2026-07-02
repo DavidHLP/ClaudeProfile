@@ -32,8 +32,9 @@
  * those exports are unaffected. New code should depend on the
  * interfaces, not the singletons.
  */
-import type { Profile, ProviderTemplate } from '../types/index.js';
+import type { ProviderTemplate } from '../types/index.js';
 import type { EditableField } from '../types/command.js';
+import type { Profile } from '../types/index.js';
 import type { ProfileService } from '../services/profileService.js';
 import type { BackupStore } from '../services/backupStore.js';
 import type { EnvPresenter } from '../presenters/envRenderer.js';
@@ -102,13 +103,18 @@ export function createTestContext(overrides: TestContextOverrides = {}): Command
  * interactive command fails loudly (because the no-op returns sentinel
  * empty strings, which then trigger validation errors) rather than
  * blocking on a real `inquirer` prompt.
+ *
+ * Note: the previous `selectProfileFromList` shim is gone. The
+ * `runSelectableAction` seam is the single home for the
+ * "select from a list" flow; tests cover it through
+ * `tests/interactiveSession.test.ts` instead of asserting a no-op
+ * sentinel for each prompt method.
  */
 export const noopPrompts: Prompts = {
   selectProvider: async () => ({ id: 'custom', name: 'Custom', description: '', defaultBaseUrl: '', defaultModel: '', envTemplate: {} } as ProviderTemplate),
   inputProfileName: async () => '',
   promptForNewName: async () => null,
   inputProfileField: async () => '',
-  selectProfileFromList: async (_profiles: Profile[], _current: string | null) => null,
   selectEditField: async (_profile: Profile) => null as EditableField | null,
   selectBackup: async () => null,
   confirmAction: async () => false,

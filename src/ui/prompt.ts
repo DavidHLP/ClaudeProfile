@@ -1,5 +1,29 @@
+/**
+ * Inquirer-backed interactive prompts.
+ *
+ * The module exposes two surfaces:
+ *   1. **Per-prompt helper functions** that wrap `inquirer` calls.
+ *      These are the "implementation" half of the `Prompts` interface
+ *      in `commands/prompts.ts`; `realPrompts` re-binds them as
+ *      methods so commands consume them through `ctx.prompts`.
+ *   2. **No `selectProfileFromList` here** — the rich profile
+ *      choice formatting (icon + name + description + token marker)
+ *      is owned by `commands/interactiveSession.ts#defaultProfileChoice`
+ *      and is wired into `runProfileAction` automatically. The
+ *      previous hand-rolled copy lived here; it was a shallow
+ *      pass-through that the deepening dissolves.
+ *
+ * Why a function-per-prompt and not one big `inquirer.prompt` call?
+ * -------------------------------------------------------------------------
+ * Because each prompt has its own validation policy and default
+ * resolution, and several are called from command bodies that need
+ * to await them individually. Centralizing the wrapping also makes
+ * them mockable as a unit in the test suite (every
+ * `tests/*Interactive*.test.ts` case builds a fresh `Prompts` bag
+ * that returns sentinel values without touching the network).
+ */
 import inquirer from 'inquirer';
-import { ProviderTemplate, Profile } from '../types/index.js';
+import { Profile, ProviderTemplate } from '../types/index.js';
 import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
 import { formatFieldDisplayValue } from '../domain/profileSchema.js';
 import { icon, theme, padVisualEnd, stripAnsi } from './theme.js';
@@ -59,63 +83,6 @@ export async function promptForNewName(defaultName: string): Promise<string | nu
   }).catch(() => null);
 }
 
-export async function inputApiToken(): Promise<string> {
-  return promptInput({
-    message: 'API Token:',
-    validate: (input: string) => {
-      if (!input.trim()) return 'Token 不能为空';
-      return true;
-    },
-  });
-}
-
-export async function inputBaseUrl(defaultValue?: string): Promise<string> {
-  return promptInput({
-    message: 'API Base URL:',
-    default: defaultValue,
-    validate: (input: string) => {
-      if (!input.trim()) return 'URL 不能为空';
-      if (!input.startsWith('http://') && !input.startsWith('https://')) {
-        return 'URL 必须以 http:// 或 https:// 开头';
-      }
-      return true;
-    },
-  });
-}
-
-export async function inputSonnetModel(defaultValue?: string): Promise<string> {
-  return promptInput({
-    message: 'SONNET 模型:',
-    default: defaultValue,
-    validate: (input: string) => {
-      if (!input.trim()) return '模型名称不能为空';
-      return true;
-    },
-  });
-}
-
-export async function inputOpusModel(defaultValue?: string): Promise<string> {
-  return promptInput({
-    message: 'OPUS 模型:',
-    default: defaultValue,
-    validate: (input: string) => {
-      if (!input.trim()) return '模型名称不能为空';
-      return true;
-    },
-  });
-}
-
-export async function inputHaikuModel(defaultValue?: string): Promise<string> {
-  return promptInput({
-    message: 'HAIKU 模型:',
-    default: defaultValue,
-    validate: (input: string) => {
-      if (!input.trim()) return '模型名称不能为空';
-      return true;
-    },
-  });
-}
-
 export async function confirmAction(message: string): Promise<boolean> {
   const { confirm } = await inquirer.prompt({
     type: 'confirm',
@@ -125,53 +92,56 @@ export async function confirmAction(message: string): Promise<boolean> {
   return confirm;
 }
 
-export async function selectProfileFromList(profiles: Profile[], currentProfile: string | null): Promise<string | null> {
-  if (profiles.length === 0) {
-    return null;
-  }
-
-  const choices = profiles.map((p) => {
-    const isActive = p.name === currentProfile;
-    const statusIcon = isActive ? icon.active : icon.standby;
-    const provider = p.description || 'Unknown';
-    const apiKey = formatFieldDisplayValue(p.env, 'token');
+/**
+ * Backup selection — the only in-module "select from a list" prompt
+ * that survives the deepening. `selectProfileFromList` was removed:
+ * its rich formatting (icon + name + provider + token marker) is
+ * now produced by `defaultProfileChoice` in
+ * `commands/interactiveSession.ts`, driven by the
+ * `runSelectableAction` seam's `formatChoice` field. The
+ * `BackupStore`-backed restore flow still needs a one-off list
+ * prompt because each entry shows a date stamp, not a profile
+ * field; it stays here as a thin wrapper.
+ */
+export async function selectBackup(backups: { name: string; path: string; date: Date }[]): Promise<string | null> {
+  const choices = backups.map((b) => {
+    const dateStr = b.date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
     return {
-      name: `${statusIcon} ${p.name} — ${provider} ${apiKey}`,
-      value: p.name,
+      name: `${b.name} - ${theme.dim(dateStr)}`,
+      value: b.path,
     };
   });
-
-  const currentIndex = currentProfile ? profiles.findIndex((p) => p.name === currentProfile) : 0;
 
   const { selected } = await inquirer.prompt({
     type: 'list',
     name: 'selected',
-    message: '请选择配置:',
+    message: '请选择要恢复的备份:',
     choices,
-    default: currentIndex >= 0 ? currentIndex : 0,
   });
 
   return selected;
 }
 
 /**
- * Produce the "current value" hint shown next to each field in the
- * edit picker. The schema's `formatFieldDisplayValue` owns the
- * per-field display policy (token → marker, others → value or
- * '(未设置)'); this helper is a one-line adapter so the call site in
- * `selectEditField` doesn't need to import the schema directly.
+ * Edit-field selection for a profile. Walks the canonical
+ * `EditableField` list (which is the schema's `ProfileField` union
+ * under a back-compat alias) and renders each as
+ *   `<label>  <current-value>`.
+ *
+ * The current-value display is delegated to the schema's
+ * `formatFieldDisplayValue` so the per-field display policy
+ * (token → `[*****]`, others → effective value or `(未设置)`) lives
+ * in one place. The previous `describeFieldValue` pass-through
+ * helper was removed: the schema's function is the single home
+ * for "what string do I show next to this field's label?".
  */
-function describeFieldValue(field: EditableField, profile: Profile): string {
-  return formatFieldDisplayValue(profile.env, field);
-}
-
 export async function selectEditField(profile: Profile): Promise<EditableField | null> {
   const fields: EditableField[] = ['token', 'baseUrl', 'sonnetModel', 'opusModel', 'haikuModel'];
 
   const labelWidth = Math.max(...fields.map((f) => stripAnsi(EDITABLE_FIELD_LABELS[f]).length));
 
   const fieldChoices = fields.map((f) => ({
-    name: `${padVisualEnd(EDITABLE_FIELD_LABELS[f], labelWidth)}  ${theme.dim(describeFieldValue(f, profile))}`,
+    name: `${padVisualEnd(EDITABLE_FIELD_LABELS[f], labelWidth)}  ${theme.dim(formatFieldDisplayValue(profile.env, f))}`,
     value: f,
   }));
 
@@ -192,21 +162,12 @@ export async function selectEditField(profile: Profile): Promise<EditableField |
   return field as EditableField | null;
 }
 
-export async function selectBackup(backups: { name: string; path: string; date: Date }[]): Promise<string | null> {
-  const choices = backups.map((b) => {
-    const dateStr = b.date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-    return {
-      name: `${b.name} - ${theme.dim(dateStr)}`,
-      value: b.path,
-    };
-  });
+// Re-export the icon set so embedders that used to reach into
+// `ui/prompt.ts#selectProfileFromList` for its `icon` reference
+// can keep the same import path.
+export { icon } from './theme.js';
 
-  const { selected } = await inquirer.prompt({
-    type: 'list',
-    name: 'selected',
-    message: '请选择要恢复的备份:',
-    choices,
-  });
-
-  return selected;
-}
+// Silence the unused-import warning for `icon` when an embedder
+// imports it from this module: the local `icon` reference would be
+// removed, but the re-export above keeps the public surface stable.
+void icon;

@@ -1,7 +1,7 @@
 import { RenameProfileInput, CommandResult } from '../types/command.js';
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
-import { runProfileAction, CancelledError } from './interactiveSession.js';
+import { runSelectableAction, CancelledError } from './interactiveSession.js';
 
 export async function renameCommand(ctx: CommandContext, input: RenameProfileInput): Promise<CommandResult> {
   return runCommand('重命名配置', async () => {
@@ -22,9 +22,11 @@ export async function renameCommand(ctx: CommandContext, input: RenameProfileInp
 }
 
 export async function renameCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
-  return runProfileAction<RenameProfileInput>(ctx, {
+  return runSelectableAction(ctx, {
     verb: '重命名',
     emptyMessage: '没有可重命名的配置。',
+    list: (c) => c.profiles.listProfiles(),
+    currentKey: (c) => c.profiles.getCurrentProfile(),
     confirm: (selected, input) => `确定要将配置 '${selected.name}' 重命名为 '${input.newName}' 吗？`,
     buildInput: async (selected, ctx) => {
       const newName = await ctx.prompts.promptForNewName(selected.name);

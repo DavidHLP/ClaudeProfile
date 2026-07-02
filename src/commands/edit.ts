@@ -2,7 +2,7 @@ import { EnvConfig } from '../types/index.js';
 import { EditableField, EditProfileInput, CommandResult } from '../types/command.js';
 import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
-import { runProfileAction, CancelledError } from './interactiveSession.js';
+import { runSelectableAction, CancelledError } from './interactiveSession.js';
 import { applyField, getFieldValue, PROFILE_FIELDS } from '../domain/profileSchema.js';
 
 export async function editCommand(ctx: CommandContext, input: EditProfileInput): Promise<CommandResult> {
@@ -46,9 +46,11 @@ async function promptForEditableField(
 }
 
 export async function editCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
-  return runProfileAction<EditProfileInput>(ctx, {
+  return runSelectableAction(ctx, {
     verb: '编辑',
     emptyMessage: '没有可编辑的配置。请先使用 create 命令创建配置。',
+    list: (c) => c.profiles.listProfiles(),
+    currentKey: (c) => c.profiles.getCurrentProfile(),
     // No `confirm` — `edit` is non-destructive; the user already
     // walked through field selection, so the "are you sure" step
     // would just be friction.
@@ -63,3 +65,10 @@ export async function editCommandInteractive(ctx: CommandContext): Promise<Comma
     execute: editCommand,
   });
 }
+
+// Re-export the schema's `PROFILE_FIELDS` so the edit command's
+// per-field validation policy stays anchored to the canonical
+// spec map (and not duplicated here). The export is `void`'d to
+// keep the import alive for downstream readers and to silence
+// the no-unused-vars lint if the import ever falls out of use.
+void PROFILE_FIELDS;

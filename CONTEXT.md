@@ -61,10 +61,13 @@ marker, others → effective value or `(未设置)`), and the
 variant (e.g. padded `[ ***** ]` / `[ UNSET ]` for the
 profile-list table) without forcing the schema to know about
 padding or ANSI dimming. Replaces the 5-case
-`ui/prompt.ts#describeFieldValue` switch, the inline
-`p.env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]'` in
-`selectProfileFromList`, and the inline
-`profile.env.ANTHROPIC_AUTH_TOKEN ? theme.dim('[ ***** ]') :
+`ui/prompt.ts#describeFieldValue` switch (removed in ADR-0013;
+the 1-line pass-through to `formatFieldDisplayValue` is now
+inlined at its single call site in `selectEditField`), the inline
+token rendering in `selectProfileFromList` (removed in ADR-0013;
+the rich profile-row formatter now lives at
+`commands/interactiveSession.ts#defaultProfileChoice`), and the
+inline `profile.env.ANTHROPIC_AUTH_TOKEN ? theme.dim('[ ***** ]') :
 theme.dim('[ UNSET ]')` in `formatProfileList`. The companion
 read function is `getEffectiveFieldValue` (display-side, primary
 plus legacy fallback). **Any code that needs to render a field's
@@ -119,18 +122,24 @@ module-level singletons.** A `CommandContext` is the test surface for
 every command.
 
 ### Prompts
-The interactive-UI seam. A `Prompts` object exposes 9 inquirer-backed
+The interactive-UI seam. A `Prompts` object exposes 8 inquirer-backed
 methods a command might need (`selectProvider`, `inputProfileField`,
-`selectProfileFromList`, `confirmAction`, etc.). `realPrompts` is
-the inquirer-backed implementation; `noopPrompts` is the test
-default (returns empty strings / nulls / false).
+`selectEditField`, `confirmAction`, etc.). `realPrompts` is the
+inquirer-backed implementation; `noopPrompts` is the test default
+(returns empty strings / nulls / false).
 
 The 5 legacy per-field prompt functions (`inputApiToken`,
 `inputBaseUrl`, `inputSonnetModel`, `inputOpusModel`,
-`inputHaikuModel`) live as top-level exports of `ui/prompt.ts` for
-embedder back-compat; they are not on the `Prompts` interface. New
-code uses `inputProfileField` (ADR-0003) or imports the top-level
-function directly (ADR-0009).
+`inputHaikuModel`) and the `selectProfileFromList` helper were
+removed from `ui/prompt.ts` in ADR-0013: the deletion test
+confirmed nothing in the codebase still called them once ADR-0009
+took the `Prompts` interface methods off the seam, and the
+profile-row formatting (`icon name — description token-marker`)
+moved to `commands/interactiveSession.ts#defaultProfileChoice`
+where the selection flow lives. New code uses `inputProfileField`
+(ADR-0003) for schema-backed per-field input, and the rich
+profile-row formatting is now wired into `runProfileAction`
+automatically — callers do not need to reach for it by hand.
 
 ### Env Presenter
 The human-facing output formatter. Owns every `format*` method that
@@ -239,19 +248,33 @@ diff in hand. **All env diffs go through this primitive; the
 `diffEnvs`.**
 
 ### Interactive Selection Flow
-The "select from a list, build input, optionally confirm, then
-execute" shape shared by all `*Interactive` commands. Lives in
+The "list → select → build input → optionally confirm → execute"
+shape shared by all `*Interactive` commands. Lives in
 `commands/interactiveSession.ts` as the `runSelectableAction`
-higher-order function and a `SelectableActionFlow` descriptor. The
-profile-specific alias `runProfileAction` is the thin back-compat
-form for the 7 commands that select profiles; the
-`restoreCommandInteractive` flow uses `runSelectableAction` with
-`TSelected = string` (the backup path). The selection UI itself
-stays in `Prompts` (`selectProfileFromList`) for the profile flow;
-non-profile flows render an inquirer list inline. **Every
-`*Interactive` command that selects from a list composes this
-flow; the list/empty/select/confirm/return-cancelled sequence is
-never re-implemented by hand.**
+higher-order function and a `SelectableActionFlow<T, TInput>`
+descriptor. One codepath; no `if (flow.list === undefined)`
+branch. The flow owns the pre-flight: `list(ctx)` returning `[]`
+yields `{ success: false, error: emptyMessage }`; the
+`skipSelectionWhenSingleMatch` flag consolidates the "single
+profile, already current, skip the prompt" pre-flight that used to
+live inline in `switchCommandInteractive`. The seam calls
+`inquirer.prompt` once with a uniform shape, matches the chosen
+key back to an item via `keyOf` (default `String(item)`), and
+threads the resolved item into `buildInput` — the previous
+"selectProfileFromList returns a name, caller re-derives the
+Profile" dance is gone. The profile-specific alias
+`runProfileAction` is the thin convenience form for the 6 profile
+flows; it wires `list = (c) => c.profiles.listProfiles()`,
+`formatChoice = defaultProfileChoice` (the rich
+`icon name — description token-marker` row, with the token marker
+sourced from the schema's `formatFieldDisplayValue`), and
+`keyOf = profileKeyOf` (profile name). The `restoreCommandInteractive`
+flow uses `runSelectableAction<string, RestoreConfigInput>` with
+its own `list` (paths) and `keyOf` (defaults to `String(path)`).
+**Every `*Interactive` command that selects from a list composes
+this flow; the list/empty/select/confirm/return-cancelled
+sequence is never re-implemented by hand, and the pre-flight
+shortcut is uniform across all profile flows.**
 
 ### Status Report
 The multi-section status block that `statusCommand` emits: a
