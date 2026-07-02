@@ -300,3 +300,17 @@ iteration is never duplicated outside `extractClaudeShellEnv`.**
   for issues.
 - Say **"Provider Template"**, not "provider" alone (a `Provider` is
   an upstream service; a `ProviderTemplate` is a preset for one).
+
+### Profile Import
+The canonical "parse + validate an imported profile" pipeline. Lives in
+`domain/profileImport.ts` and owns: the `ImportFormat` union (`'json' |
+'yaml'`), the `ProfileImportError` class (extends `AppError`), the
+`detectImportFormat(filePath, override?)` pure function (path-based
+format detection with explicit override), and the
+`parseImportedProfile(content, format, profileNameOverride?)` pure
+function (the single entry point the import command calls). The
+validation order — parse → shape → name → env keys → env values — is
+load-bearing; the parser stops at the first failure. **All import
+paths go through this seam; the format dispatch and the shape check
+are never duplicated outside it.**
+

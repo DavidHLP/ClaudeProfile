@@ -1,39 +1,16 @@
 import { readFileSync } from 'fs';
 import { ImportProfileInput, CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
-import { FileOperationError, ProfileAlreadyExistsError, AppError } from '../errors.js';
-import { Profile } from '../types/index.js';
-import * as YAML from 'yaml';
-import { validateProfileName, validateEnvKey, validateEnvValue } from '../utils/validation.js';
+import { FileOperationError, ProfileAlreadyExistsError } from '../errors.js';
+import { detectImportFormat, parseImportedProfile } from '../domain/profileImport.js';
 import type { CommandContext } from './context.js';
-
-function detectFormat(inputPath: string, format?: 'json' | 'yaml'): 'json' | 'yaml' {
-  if (format) return format;
-  const ext = inputPath.toLowerCase().split('.').pop();
-  if (ext === 'yaml' || ext === 'yml') return 'yaml';
-  return 'json';
-}
-
-function parseProfileFile(content: string, format: 'json' | 'yaml'): Partial<Profile> {
-  if (format === 'yaml') {
-    return YAML.parse(content, { schema: 'core' }) as Partial<Profile>;
-  }
-  return JSON.parse(content) as Partial<Profile>;
-}
-
-function validateImportedProfile(data: unknown): data is Profile {
-  if (typeof data !== 'object' || data === null) return false;
-  const obj = data as Record<string, unknown>;
-  if (typeof obj.name !== 'string' || !obj.name.trim()) return false;
-  if (typeof obj.env !== 'object' || obj.env === null) return false;
-  return true;
-}
 
 export async function importFileCommand(ctx: CommandContext, input: ImportProfileInput): Promise<CommandResult> {
   return runCommand('导入配置', async () => {
-    const format = detectFormat(input.inputPath, input.format);
+    const format = detectImportFormat(input.inputPath, input.format);
 
-    // Read file
+    // 1. Read the file (I/O stays in the command layer; the domain
+    //    primitive is pure and content-shaped).
     let content: string;
     try {
       content = readFileSync(input.inputPath, 'utf-8');
@@ -41,56 +18,18 @@ export async function importFileCommand(ctx: CommandContext, input: ImportProfil
       throw new FileOperationError('read', input.inputPath, err);
     }
 
-    // Parse file
-    let parsed: unknown;
-    try {
-      parsed = parseProfileFile(content, format);
-    } catch (err) {
-      throw new AppError(`无效的 ${format.toUpperCase()} 格式: ${err instanceof Error ? err.message : String(err)}`, 'INVALID_FORMAT');
+    // 2. Parse + validate. Throws `ProfileImportError` (an AppError
+    //    subclass) on any failure; `runCommand` surfaces it.
+    const profile = parseImportedProfile(content, format, input.profileName);
+
+    // 3. Existence check (CLI behavior preserved: refuse unless --force).
+    if (ctx.profiles.profileExists(profile.name) && !input.force) {
+      throw new ProfileAlreadyExistsError(profile.name);
     }
 
-    // Validate schema
-    if (!validateImportedProfile(parsed)) {
-      throw new AppError('无效的配置文件结构: 缺少 name 或 env 字段', 'INVALID_PROFILE_SCHEMA');
-    }
-
-    // Use provided profile name or the one from file
-    const profileName = input.profileName?.trim() || parsed.name;
-
-    // Validate profile name
-    const nameError = validateProfileName(profileName);
-    if (nameError) {
-      throw new AppError(nameError.message, nameError.code);
-    }
-
-    // Validate env keys and values
-    for (const [key, value] of Object.entries(parsed.env as Record<string, unknown>)) {
-      const keyError = validateEnvKey(key);
-      if (keyError) {
-        throw new AppError(keyError.message, keyError.code);
-      }
-      const valueError = validateEnvValue(value);
-      if (valueError) {
-        throw new AppError(valueError.message, valueError.code);
-      }
-    }
-
-    // Check if profile already exists
-    if (ctx.profiles.profileExists(profileName) && !input.force) {
-      throw new ProfileAlreadyExistsError(profileName);
-    }
-
-    // Create profile
-    const profile: Profile = {
-      name: profileName,
-      description: parsed.description || '',
-      env: { ...parsed.env },
-    };
-
-    // Save profile
+    // 4. Persist + present.
     ctx.profiles.saveProfile(profile);
-
-    return { success: true, output: ctx.env.formatImportSuccess(profileName, input.inputPath) };
+    return { success: true, output: ctx.env.formatImportSuccess(profile.name, input.inputPath) };
   });
 }
 
@@ -107,7 +46,9 @@ export async function importFileCommandInteractive(ctx: CommandContext): Promise
     return { success: false, error: '已取消导入。', wasCancelled: true };
   }
 
-  const format = inputPath.toLowerCase().endsWith('.yaml') || inputPath.toLowerCase().endsWith('.yml') ? 'yaml' : 'json';
+  // Reuse the same format-detection primitive as the non-interactive
+  // path so the two never drift on what counts as a YAML file.
+  const format = detectImportFormat(inputPath);
 
   const confirmed = await ctx.prompts.confirmAction(`确定要从 '${inputPath}' 导入配置吗？`);
   if (!confirmed) {

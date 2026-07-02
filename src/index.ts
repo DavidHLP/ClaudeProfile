@@ -123,3 +123,11 @@ export {
   type ProfileActionFlow,
   type ConfirmMessage,
 } from './commands/interactiveSession.js';
+
+// ── Profile import pipeline (parse + validate) ───
+export {
+  detectImportFormat,
+  parseImportedProfile,
+  ProfileImportError,
+  type ImportFormat,
+} from './domain/profileImport.js';
