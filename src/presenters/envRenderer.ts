@@ -80,6 +80,30 @@ export interface EnvPresenter {
       readonly severity: 'error' | 'warning';
     }>
   ): string;
+  /**
+   * Render the diagnostic report that `doctorCommand` emits: a per-check
+   * icon + name + message block, followed by a one-line summary
+   * (ok / warning / error counts). The caller supplies the
+   * `CheckResult[]` from `domain/diagnostic.ts#runDiagnostics`; the
+   * presenter is responsible for the line shape and the icon per
+   * status.
+   *
+   * The output is the report joined with newlines, with leading and
+   * trailing blank lines (one each) so callers can drop it into the
+   * command's output without additional spacing.
+   *
+   * Why this exists: before this seam, the report shape (icon +
+   * per-line indent + summary line) was inlined in `doctorCommand`
+   * as 11 `lines.push(...)` calls. The "what does a diagnostic look
+   * like" is one fact; the deletion test confirms it: remove this
+   * method and the 11-line block reappears in the command.
+   */
+  formatDiagnosticReport(results: ReadonlyArray<{
+    readonly name: string;
+    readonly status: 'ok' | 'warning' | 'error';
+    readonly message: string;
+    readonly suggestion?: string;
+  }>): string;
 }
 
 class EnvPresenterImpl implements EnvPresenter {
@@ -290,6 +314,38 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
       }
     }
     return blocks.join('\n');
+  }
+
+  formatDiagnosticReport(results: ReadonlyArray<{
+    readonly name: string;
+    readonly status: 'ok' | 'warning' | 'error';
+    readonly message: string;
+    readonly suggestion?: string;
+  }>): string {
+    const lines: string[] = [''];
+    lines.push('  诊断报告');
+    lines.push('');
+
+    for (const check of results) {
+      const iconChar =
+        check.status === 'ok'
+          ? icon.success
+          : check.status === 'warning'
+          ? icon.warning
+          : icon.error;
+      lines.push(`  ${iconChar} ${check.name}: ${check.message}`);
+      if (check.suggestion) {
+        lines.push(`      → ${check.suggestion}`);
+      }
+    }
+
+    const ok = results.filter((c) => c.status === 'ok').length;
+    const warnings = results.filter((c) => c.status === 'warning').length;
+    const errors = results.filter((c) => c.status === 'error').length;
+    lines.push('');
+    lines.push(`  总结: ${ok} 通过, ${warnings} 警告, ${errors} 错误`);
+    lines.push('');
+    return lines.join('\n');
   }
 }
 
