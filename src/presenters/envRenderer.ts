@@ -32,6 +32,54 @@ export interface EnvPresenter {
   formatProfileDetail(profile: Profile, isCurrent: boolean): string;
   formatNoProfiles(): string;
   formatCancel(message: string): string;
+  /**
+   * Render the 5-line "verbose context" header that `listCommand` and
+   * `validateCommand` both emit when the user passes `--verbose`. The
+   * shape is stable across commands; the data (`storeLocation`,
+   * `currentProfile`, `profileCount`) is supplied by the caller.
+   *
+   * The returned string is the 5 lines joined with `\n`, with **no**
+   * leading or trailing newline. Callers are responsible for the
+   * surrounding whitespace — `listCommand` joins with `''` separators,
+   * `validateCommand` joins with `'\n'` — so the seam stays neutral
+   * and the command can produce its own spacing context.
+   *
+   * Why this exists: before this seam, the 5-line `['', '详细信息:',
+   *   '  配置目录: …', '  当前配置: …', '  配置数量: …']` array was
+   * copy-pasted across `listCommand` and the three verbose branches of
+   * `validateCommand`. The "where am I looking" header is conceptually
+   * one fact; the deletion test confirms it: remove the seam and the
+   * 5-line block reappears across 4 sites within a few lines of edit.
+   */
+  formatVerboseHeader(input: {
+    storeLocation: string | null;
+    currentProfile: string | null;
+    profileCount: number;
+  }): string;
+  /**
+   * Render a list of profile-attached validation issues as the
+   * "❌ 发现 N 个错误 / ⚠️ 发现 N 个警告" block that `validateCommand`
+   * emits. Issues are split by severity; the inner bullet line
+   * (`• [profile] envKey: message`) is the same shape for both
+   * severities.
+   *
+   * Accepts the display-shaped issue (with `profile` attached) rather
+   * than the schema's profile-free `ValidationIssue`, so the seam
+   * stays honest about what it needs: `profile`, `envKey`, `message`,
+   * `severity`. The `field` info is unused by the presenter (the
+   * message already embeds the env key).
+   *
+   * Returns `''` when `issues` is empty — the caller no longer has to
+   * guard against the no-issues case.
+   */
+  formatValidationIssues(
+    issues: ReadonlyArray<{
+      readonly profile: string;
+      readonly envKey: string;
+      readonly message: string;
+      readonly severity: 'error' | 'warning';
+    }>
+  ): string;
 }
 
 class EnvPresenterImpl implements EnvPresenter {
@@ -198,6 +246,50 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
 
   formatCancel(message: string): string {
     return message;
+  }
+
+  formatVerboseHeader(input: {
+    storeLocation: string | null;
+    currentProfile: string | null;
+    profileCount: number;
+  }): string {
+    // Stable 5-line shape; the data is supplied by the caller. No
+    // leading/trailing newlines — the caller composes spacing.
+    return [
+      '详细信息:',
+      `  配置目录: ${input.storeLocation || '未知'}`,
+      `  当前配置: ${input.currentProfile || '无'}`,
+      `  配置数量: ${input.profileCount}`,
+    ].join('\n');
+  }
+
+  formatValidationIssues(
+    issues: ReadonlyArray<{
+      readonly profile: string;
+      readonly envKey: string;
+      readonly message: string;
+      readonly severity: 'error' | 'warning';
+    }>
+  ): string {
+    if (issues.length === 0) {
+      return '';
+    }
+    const errors = issues.filter((i) => i.severity === 'error');
+    const warnings = issues.filter((i) => i.severity === 'warning');
+    const blocks: string[] = [];
+    if (errors.length > 0) {
+      blocks.push(`❌ 发现 ${errors.length} 个错误:`);
+      for (const issue of errors) {
+        blocks.push(`  • [${issue.profile}] ${issue.envKey}: ${issue.message}`);
+      }
+    }
+    if (warnings.length > 0) {
+      blocks.push(`⚠️  发现 ${warnings.length} 个警告:`);
+      for (const issue of warnings) {
+        blocks.push(`  • [${issue.profile}] ${issue.envKey}: ${issue.message}`);
+      }
+    }
+    return blocks.join('\n');
   }
 }
 

@@ -312,4 +312,106 @@ describe('EnvPresenter', () => {
       expect(result).toContain('已创建');
     });
   });
+
+  // ── formatVerboseHeader (ADR-0005) ────────────────────────────────
+
+  describe('formatVerboseHeader', () => {
+    it('should render all four data fields in order', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: '/home/u/.config/claude-profile',
+        currentProfile: 'minimax',
+        profileCount: 3,
+      });
+
+      const lines = result.split('\n');
+      expect(lines).toEqual([
+        '详细信息:',
+        '  配置目录: /home/u/.config/claude-profile',
+        '  当前配置: minimax',
+        '  配置数量: 3',
+      ]);
+    });
+
+    it('should fall back to 未知 when storeLocation is null', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: null,
+        currentProfile: 'minimax',
+        profileCount: 1,
+      });
+      expect(result).toContain('配置目录: 未知');
+    });
+
+    it('should fall back to 无 when currentProfile is null', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: '/p',
+        currentProfile: null,
+        profileCount: 0,
+      });
+      expect(result).toContain('当前配置: 无');
+    });
+
+    it('should not add leading or trailing newline', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: '/p',
+        currentProfile: 'x',
+        profileCount: 1,
+      });
+      expect(result.startsWith('\n')).toBe(false);
+      expect(result.endsWith('\n')).toBe(false);
+    });
+  });
+
+  // ── formatValidationIssues (ADR-0005) ─────────────────────────────
+
+  describe('formatValidationIssues', () => {
+    it('should return empty string for empty issues', () => {
+      expect(envPresenter.formatValidationIssues([])).toBe('');
+    });
+
+    it('should render errors with the ❌ header', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'a', envKey: 'ANTHROPIC_BASE_URL', message: 'URL 不能为空', severity: 'error' },
+      ]);
+      expect(result).toContain('❌ 发现 1 个错误:');
+      expect(result).toContain('  • [a] ANTHROPIC_BASE_URL: URL 不能为空');
+    });
+
+    it('should render warnings with the ⚠️ header', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'b', envKey: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', message: 'ANTHROPIC_DEFAULT_HAIKU_MODEL 未设置', severity: 'warning' },
+      ]);
+      expect(result).toContain('⚠️  发现 1 个警告:');
+      expect(result).toContain('  • [b] ANTHROPIC_DEFAULT_HAIKU_MODEL: ANTHROPIC_DEFAULT_HAIKU_MODEL 未设置');
+    });
+
+    it('should split errors and warnings into two blocks, errors first', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'p1', envKey: 'ANTHROPIC_BASE_URL', message: 'empty', severity: 'error' },
+        { profile: 'p1', envKey: 'ANTHROPIC_AUTH_TOKEN', message: 'empty', severity: 'error' },
+        { profile: 'p2', envKey: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', message: 'unset', severity: 'warning' },
+      ]);
+      const errIdx = result.indexOf('❌');
+      const warnIdx = result.indexOf('⚠️');
+      expect(errIdx).toBeGreaterThanOrEqual(0);
+      expect(warnIdx).toBeGreaterThan(errIdx);
+      expect(result).toContain('❌ 发现 2 个错误:');
+      expect(result).toContain('⚠️  发现 1 个警告:');
+    });
+
+    it('should render only the errors block when no warnings', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'p', envKey: 'K', message: 'm', severity: 'error' },
+      ]);
+      expect(result).toContain('❌');
+      expect(result).not.toContain('⚠️');
+    });
+
+    it('should render only the warnings block when no errors', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'p', envKey: 'K', message: 'm', severity: 'warning' },
+      ]);
+      expect(result).toContain('⚠️');
+      expect(result).not.toContain('❌');
+    });
+  });
 });

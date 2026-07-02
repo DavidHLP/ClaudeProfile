@@ -44,19 +44,20 @@ export async function validateCommand(ctx: CommandContext, options: ValidateOpti
   if (errors.length === 0 && warnings.length === 0) {
     if (options.verbose) {
       // Reuse the shared per-profile detail renderer so list/validate
-      // never drift apart.
+      // never drift apart. The verbose header and the issue block are
+      // both owned by EnvPresenter (ADR-0005); this command only
+      // supplies the data and the surrounding spacing.
       const detailBlocks = profiles.map((profile) =>
         ctx.env.formatProfileDetail(profile, profile.name === currentProfile)
       );
-      const header = [
-        `\n详细信息:`,
-        `  配置目录: ${ctx.profiles.getStoreLocation() || '未知'}`,
-        `  当前配置: ${currentProfile || '无'}`,
-        `  配置数量: ${profiles.length}`,
-      ];
+      const header = ctx.env.formatVerboseHeader({
+        storeLocation: ctx.profiles.getStoreLocation(),
+        currentProfile,
+        profileCount: profiles.length,
+      });
       return {
         success: true,
-        output: `验证通过：${profiles.length} 个配置检查无误\n${header.join('\n')}\n\n${detailBlocks.join('\n\n')}`,
+        output: `验证通过：${profiles.length} 个配置检查无误\n\n${header}\n\n${detailBlocks.join('\n\n')}`,
       };
     }
     return {
@@ -65,19 +66,10 @@ export async function validateCommand(ctx: CommandContext, options: ValidateOpti
     };
   }
 
-  if (errors.length > 0) {
-    lines.push(`❌ 发现 ${errors.length} 个错误:`);
-    for (const issue of errors) {
-      lines.push(`  • [${issue.profile}] ${issue.envKey}: ${issue.message}`);
-    }
-  }
-
-  if (warnings.length > 0) {
-    lines.push(`⚠️  发现 ${warnings.length} 个警告:`);
-    for (const issue of warnings) {
-      lines.push(`  • [${issue.profile}] ${issue.envKey}: ${issue.message}`);
-    }
-  }
+  // Issue block (errors + warnings) is owned by EnvPresenter (ADR-0005).
+  // The empty-string elements between blocks preserve the original
+  // blank-line spacing (one blank line between sections).
+  lines.push(ctx.env.formatValidationIssues(allIssues));
 
   if (options.verbose) {
     // Even on failure, surface the per-profile detail so users can
@@ -85,10 +77,12 @@ export async function validateCommand(ctx: CommandContext, options: ValidateOpti
     const detailBlocks = profiles.map((profile) =>
       ctx.env.formatProfileDetail(profile, profile.name === currentProfile)
     );
-    lines.push('\n详细信息:');
-    lines.push(`  配置目录: ${ctx.profiles.getStoreLocation() || '未知'}`);
-    lines.push(`  当前配置: ${currentProfile || '无'}`);
-    lines.push(`  配置数量: ${profiles.length}`);
+    lines.push('');
+    lines.push(ctx.env.formatVerboseHeader({
+      storeLocation: ctx.profiles.getStoreLocation(),
+      currentProfile,
+      profileCount: profiles.length,
+    }));
     lines.push('');
     lines.push(...detailBlocks);
   }

@@ -70,6 +70,27 @@ read function is `getEffectiveFieldValue` (display-side, primary
 plus legacy fallback). **Any code that needs to render a field's
 current value as a string goes through this seam.**
 
+### Verbose Report
+The "where am I looking" header (`详细信息:` / `配置目录: …` /
+`当前配置: …` / `配置数量: …`) that `listCommand --verbose` and
+`validateCommand --verbose` emit before the per-profile detail
+blocks. Owned by `EnvPresenter.formatVerboseHeader` (ADR-0005). The
+caller supplies the data (`storeLocation`, `currentProfile`,
+`profileCount`) and the surrounding whitespace context; the seam
+stays neutral. **Any command that wants the 5-line header goes
+through this seam; the array literal is never re-constructed in
+the command layer.**
+
+### Issue Block
+The "❌ 发现 N 个错误 / ⚠️ 发现 N 个警告" block that
+`validateCommand` emits when at least one profile fails validation.
+Owned by `EnvPresenter.formatValidationIssues` (ADR-0005). The seam
+accepts the display-shaped issue (`{ profile, envKey, message,
+severity }`) — the command's `{ ...issue, profile: profile.name }`
+adapter is the single place where the schema's profile-free
+`ValidationIssue` meets the presenter's display shape. Returns
+`''` when the input is empty so callers don't have to guard.
+
 ### Profile Field → Env Key Mapping
 A field may own one or two env keys. The SONNET field owns both
 `ANTHROPIC_DEFAULT_SONNET_MODEL` (the slot override, primary) and

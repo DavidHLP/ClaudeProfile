@@ -23,21 +23,23 @@ export async function listCommand(ctx: CommandContext, options: ListOptions = {}
 
     // Verbose mode: per-profile detail via the shared presenter so
     // list/validate stay in lock-step without duplicating field order.
+    // The header is owned by EnvPresenter.formatVerboseHeader (ADR-0005);
+    // this command only supplies the data and the surrounding spacing.
     const detailBlocks = profiles.map((profile) =>
       ctx.env.formatProfileDetail(profile, profile.name === currentProfile)
     );
-
-    const header = [
-      '',
-      '详细信息:',
-      `  配置目录: ${ctx.profiles.getStoreLocation() || '未知'}`,
-      `  当前配置: ${currentProfile || '无'}`,
-      `  配置数量: ${profiles.length}`,
-    ];
+    const header = ctx.env.formatVerboseHeader({
+      storeLocation: ctx.profiles.getStoreLocation(),
+      currentProfile,
+      profileCount: profiles.length,
+    });
 
     return {
       success: true,
-      output: [baseOutput, '', ...header, '', ...detailBlocks].join('\n'),
+      // The extra '' between baseOutput and header preserves the
+      // original blank-line spacing (3 newlines / 2 blank lines between
+      // the table and 详细信息:).
+      output: [baseOutput, '', '', header, '', ...detailBlocks].join('\n'),
     };
   });
 }
