@@ -227,6 +227,103 @@ export function defaultFieldValue(
 }
 
 /**
+ * Read the "effective" value of a field for display purposes.
+ *
+ * Returns the first non-empty value across the field's env keys, in
+ * the canonical env-key order (primary first, legacy fallbacks after).
+ *
+ * Differs from `getFieldValue` in exactly one case: when the primary
+ * env key is empty but a secondary (legacy) env key has a value, this
+ * returns the legacy value while `getFieldValue` returns `undefined`.
+ *
+ * Why a separate read function?
+ *   - Write / validate paths use the strict primary-only semantics of
+ *     `getFieldValue` / `applyField` (we want to know "is the primary
+ *     slot set?" — independent of whether the legacy slot happens to
+ *     hold a stale value).
+ *   - Display paths need the legacy fallback so older profiles
+ *     (where only `ANTHROPIC_MODEL` is set and the new
+ *     `ANTHROPIC_DEFAULT_SONNET_MODEL` is empty) show their
+ *     effective sonnet model.
+ *
+ * Both reads are needed; conflating them would force one path to
+ * duplicate the iteration logic.
+ */
+export function getEffectiveFieldValue(
+  env: EnvConfig,
+  field: ProfileField
+): string | undefined {
+  const spec = PROFILE_FIELDS[field];
+  for (const key of spec.envKeys) {
+    const v = env[key];
+    if (v && v.trim()) return v;
+  }
+  return undefined;
+}
+
+/**
+ * Display-side options for `formatFieldDisplayValue`. Lets callers
+ * pick the visual variant (e.g. `[*****]` vs the padded `[ ***** ]`
+ * used in the profile-list table) without forcing the schema to
+ * know about padding or ANSI dimming.
+ *
+ * Every option is optional; defaults match the original
+ * `ui/prompt.ts#describeFieldValue` and
+ * `presenters/envRenderer.ts#formatProfileList` literals so the
+ * collapsing change is byte-identical for the simple callers.
+ */
+export interface FieldDisplayOptions {
+  /**
+   * Marker rendered when the token field is set. Default: `'[*****]'`.
+   * The profile-list table passes `'[ ***** ]'` (padded) to align
+   * with the API KEY column width.
+   */
+  readonly setMarker?: string;
+  /**
+   * Marker rendered when the token field is unset. Default: `'[UNSET]'`.
+   * The profile-list table passes `'[ UNSET ]'` (padded).
+   */
+  readonly unsetMarker?: string;
+  /**
+   * Marker rendered when a non-token field is unset. Default: `'(未设置)'`.
+   * The detail panel uses `'未设置'` (no parens) and the verbose header
+   * uses the same; callers that want a different convention pass it here.
+   */
+  readonly unsetText?: string;
+}
+
+/**
+ * Produce the human-readable "current value" indicator for a field.
+ *
+ *   - For the `token` field: returns the set / unset marker (token is
+ *     never rendered raw, to avoid leaking secrets into the TUI).
+ *   - For all other fields: returns the effective value if set, or the
+ *     unset text otherwise.
+ *
+ * This is the canonical "what string do I show next to this field's
+ * label in a list / picker / table?" function. Callers go through it
+ * so the per-field display policy lives in exactly one place.
+ *
+ * Pure function — no I/O, no DI, no ANSI. The caller applies `theme.dim`
+ * or padding as needed; the schema returns the raw string.
+ */
+export function formatFieldDisplayValue(
+  env: EnvConfig,
+  field: ProfileField,
+  options?: FieldDisplayOptions
+): string {
+  const setMarker = options?.setMarker ?? '[*****]';
+  const unsetMarker = options?.unsetMarker ?? '[UNSET]';
+  const unsetText = options?.unsetText ?? '(未设置)';
+  const value = getEffectiveFieldValue(env, field);
+  if (value) {
+    return field === 'token' ? setMarker : value;
+  }
+  return field === 'token' ? unsetMarker : unsetText;
+}
+
+
+/**
  * Apply a field change to an env, returning a new env (immutable).
  * Writes to every env key in the field's `envKeys` list, so SONNET
  * updates both `ANTHROPIC_DEFAULT_SONNET_MODEL` and the legacy

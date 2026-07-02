@@ -1,6 +1,7 @@
 import inquirer from 'inquirer';
 import { ProviderTemplate, Profile } from '../types/index.js';
 import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
+import { formatFieldDisplayValue } from '../domain/profileSchema.js';
 import { icon, theme, padVisualEnd, stripAnsi } from './theme.js';
 
 export async function promptInput(options: {
@@ -133,7 +134,7 @@ export async function selectProfileFromList(profiles: Profile[], currentProfile:
     const isActive = p.name === currentProfile;
     const statusIcon = isActive ? icon.active : icon.standby;
     const provider = p.description || 'Unknown';
-    const apiKey = p.env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]';
+    const apiKey = formatFieldDisplayValue(p.env, 'token');
     return {
       name: `${statusIcon} ${p.name} — ${provider} ${apiKey}`,
       value: p.name,
@@ -153,20 +154,15 @@ export async function selectProfileFromList(profiles: Profile[], currentProfile:
   return selected;
 }
 
+/**
+ * Produce the "current value" hint shown next to each field in the
+ * edit picker. The schema's `formatFieldDisplayValue` owns the
+ * per-field display policy (token → marker, others → value or
+ * '(未设置)'); this helper is a one-line adapter so the call site in
+ * `selectEditField` doesn't need to import the schema directly.
+ */
 function describeFieldValue(field: EditableField, profile: Profile): string {
-  const env = profile.env;
-  switch (field) {
-    case 'token':
-      return env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]';
-    case 'baseUrl':
-      return env.ANTHROPIC_BASE_URL || '(未设置)';
-    case 'sonnetModel':
-      return env.ANTHROPIC_DEFAULT_SONNET_MODEL || env.ANTHROPIC_MODEL || '(未设置)';
-    case 'opusModel':
-      return env.ANTHROPIC_DEFAULT_OPUS_MODEL || '(未设置)';
-    case 'haikuModel':
-      return env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '(未设置)';
-  }
+  return formatFieldDisplayValue(profile.env, field);
 }
 
 export async function selectEditField(profile: Profile): Promise<EditableField | null> {

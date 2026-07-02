@@ -6,7 +6,9 @@ import {
   ProfileField,
   applyField,
   getFieldValue,
+  getEffectiveFieldValue,
   defaultFieldValue,
+  formatFieldDisplayValue,
   validateProfile,
   profileDetailRows,
   maskProfileValue,
@@ -422,5 +424,134 @@ describe('defaultFieldValue', () => {
     for (const field of fields) {
       expect(defaultFieldValue({}, field, 'fb')).toBe('fb');
     }
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// ADR-0004: ProfileFieldDisplay seam — getEffectiveFieldValue +
+// formatFieldDisplayValue. The 3 hand-rolled display sites
+// (ui/prompt.ts#describeFieldValue, selectProfileFromList,
+// presenters/envRenderer.ts#formatProfileList) all collapse into
+// formatFieldDisplayValue; the SONNET primary-then-legacy display
+// subtlety is now owned by getEffectiveFieldValue.
+// ────────────────────────────────────────────────────────────────────────
+
+describe('getEffectiveFieldValue', () => {
+  it('returns the primary env value when the primary is set', () => {
+    const env: EnvConfig = { ANTHROPIC_DEFAULT_SONNET_MODEL: 'primary', ANTHROPIC_MODEL: 'legacy' };
+    expect(getEffectiveFieldValue(env, 'sonnetModel')).toBe('primary');
+  });
+
+  it('falls back to the legacy env key when the primary is empty', () => {
+    const env: EnvConfig = { ANTHROPIC_MODEL: 'legacy' };
+    expect(getEffectiveFieldValue(env, 'sonnetModel')).toBe('legacy');
+  });
+
+  it('falls back to legacy when the primary is whitespace', () => {
+    const env: EnvConfig = {
+      ANTHROPIC_DEFAULT_SONNET_MODEL: '   ',
+      ANTHROPIC_MODEL: 'legacy',
+    };
+    expect(getEffectiveFieldValue(env, 'sonnetModel')).toBe('legacy');
+  });
+
+  it('returns undefined when every env key is empty / whitespace', () => {
+    const env: EnvConfig = {
+      ANTHROPIC_DEFAULT_SONNET_MODEL: '',
+      ANTHROPIC_MODEL: '   ',
+    };
+    expect(getEffectiveFieldValue(env, 'sonnetModel')).toBeUndefined();
+  });
+
+  it('returns the only env key for single-key fields', () => {
+    expect(getEffectiveFieldValue({ ANTHROPIC_BASE_URL: 'https://x' }, 'baseUrl')).toBe('https://x');
+    expect(getEffectiveFieldValue({ ANTHROPIC_BASE_URL: '' }, 'baseUrl')).toBeUndefined();
+  });
+
+  it('differs from getFieldValue on the primary-empty / legacy-set case', () => {
+    // The whole point of having two read functions: getFieldValue is
+    // primary-only (used by write/validate), getEffectiveFieldValue
+    // is first-non-empty (used by display).
+    const env: EnvConfig = { ANTHROPIC_MODEL: 'legacy' };
+    expect(getFieldValue(env, 'sonnetModel')).toBeUndefined();
+    expect(getEffectiveFieldValue(env, 'sonnetModel')).toBe('legacy');
+  });
+});
+
+describe('formatFieldDisplayValue', () => {
+  it('returns the default [*****] marker for a set token field', () => {
+    const env: EnvConfig = { ANTHROPIC_AUTH_TOKEN: 'secret' };
+    expect(formatFieldDisplayValue(env, 'token')).toBe('[*****]');
+  });
+
+  it('returns the default [UNSET] marker for an unset token field', () => {
+    expect(formatFieldDisplayValue({}, 'token')).toBe('[UNSET]');
+  });
+
+  it('honors custom token markers for the padded profile-list table variant', () => {
+    const set: EnvConfig = { ANTHROPIC_AUTH_TOKEN: 'secret' };
+    const unset: EnvConfig = {};
+    expect(
+      formatFieldDisplayValue(set, 'token', { setMarker: '[ ***** ]', unsetMarker: '[ UNSET ]' })
+    ).toBe('[ ***** ]');
+    expect(
+      formatFieldDisplayValue(unset, 'token', { setMarker: '[ ***** ]', unsetMarker: '[ UNSET ]' })
+    ).toBe('[ UNSET ]');
+  });
+
+  it('returns the effective value for a set non-token field', () => {
+    const env: EnvConfig = { ANTHROPIC_BASE_URL: 'https://x.com' };
+    expect(formatFieldDisplayValue(env, 'baseUrl')).toBe('https://x.com');
+  });
+
+  it('returns (未设置) for an unset non-token field by default', () => {
+    expect(formatFieldDisplayValue({}, 'baseUrl')).toBe('(未设置)');
+    expect(formatFieldDisplayValue({}, 'opusModel')).toBe('(未设置)');
+    expect(formatFieldDisplayValue({}, 'haikuModel')).toBe('(未设置)');
+  });
+
+  it('honors a custom unsetText', () => {
+    // The detail panel uses '未设置' (no parens); the picker uses
+    // '(未设置)'. Both forms are valid — callers pick.
+    expect(
+      formatFieldDisplayValue({}, 'baseUrl', { unsetText: '未设置' })
+    ).toBe('未设置');
+  });
+
+  it('falls back from primary to legacy for sonnetModel display', () => {
+    // This is the SONNET primary-then-legacy subtlety that was
+    // previously inline in `describeFieldValue`. The display path
+    // must show the legacy value when the primary is empty.
+    const env: EnvConfig = { ANTHROPIC_MODEL: 'legacy-sonnet' };
+    expect(formatFieldDisplayValue(env, 'sonnetModel')).toBe('legacy-sonnet');
+  });
+
+  it('treats whitespace-only values as unset', () => {
+    const env: EnvConfig = { ANTHROPIC_BASE_URL: '   ' };
+    expect(formatFieldDisplayValue(env, 'baseUrl')).toBe('(未设置)');
+  });
+
+  it('matches the original describeFieldValue outputs byte-for-byte', () => {
+    // Regression guard: the collapsing change must be byte-identical
+    // for callers that pass no options.
+    const set: EnvConfig = {
+      ANTHROPIC_AUTH_TOKEN: 't',
+      ANTHROPIC_BASE_URL: 'https://b',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 's',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'o',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'h',
+    };
+    expect(formatFieldDisplayValue(set, 'token')).toBe('[*****]');
+    expect(formatFieldDisplayValue(set, 'baseUrl')).toBe('https://b');
+    expect(formatFieldDisplayValue(set, 'sonnetModel')).toBe('s');
+    expect(formatFieldDisplayValue(set, 'opusModel')).toBe('o');
+    expect(formatFieldDisplayValue(set, 'haikuModel')).toBe('h');
+
+    const empty: EnvConfig = {};
+    expect(formatFieldDisplayValue(empty, 'token')).toBe('[UNSET]');
+    expect(formatFieldDisplayValue(empty, 'baseUrl')).toBe('(未设置)');
+    expect(formatFieldDisplayValue(empty, 'sonnetModel')).toBe('(未设置)');
+    expect(formatFieldDisplayValue(empty, 'opusModel')).toBe('(未设置)');
+    expect(formatFieldDisplayValue(empty, 'haikuModel')).toBe('(未设置)');
   });
 });

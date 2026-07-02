@@ -11,7 +11,7 @@
 import { EnvConfig, Profile } from '../types/index.js';
 import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
 import { theme, icon, padVisualEnd, box } from '../ui/theme.js';
-import { profileDetailRows, maskProfileValue } from '../domain/profileSchema.js';
+import { profileDetailRows, maskProfileValue, formatFieldDisplayValue } from '../domain/profileSchema.js';
 
 export interface EnvPresenter {
   formatBanner(): string;
@@ -87,7 +87,10 @@ ${box.bl}${box.h.repeat(innerWidth + 2)}${box.br}`;
     for (const profile of profiles) {
       const isActive = profile.name === currentProfile;
       const status = isActive ? theme.active('已激活') : theme.standby('待命');
-      const apiKey = profile.env.ANTHROPIC_AUTH_TOKEN ? theme.dim('[ ***** ]') : theme.dim('[ UNSET ]');
+      const apiKey = theme.dim(formatFieldDisplayValue(profile.env, 'token', {
+      setMarker: '[ ***** ]',
+      unsetMarker: '[ UNSET ]',
+    }));
       const provider = profile.description || 'Unknown';
 
       const marker = isActive ? icon.active : icon.standby;

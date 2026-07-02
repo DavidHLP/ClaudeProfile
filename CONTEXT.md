@@ -41,6 +41,35 @@ and the pure functions `applyField`, `getFieldValue`, `validateProfile`,
 presenters go through the schema; the "5-field shape" is never
 duplicated outside it.**
 
+### Effective Field Value
+The "first non-empty env key" read for a field, used by the display
+path. Distinct from `getFieldValue` (primary-only, used by write /
+validate paths): when the primary env key is empty but a legacy env
+key has a value (e.g. an older profile where only `ANTHROPIC_MODEL`
+is set and the new `ANTHROPIC_DEFAULT_SONNET_MODEL` is empty),
+`getEffectiveFieldValue` returns the legacy value while
+`getFieldValue` returns `undefined`. Lives in
+`domain/profileSchema.ts` as a pure function.
+
+### Profile Field Display
+The schema-backed "what string do I show next to this field's
+label?" function. Exposed as
+`formatFieldDisplayValue(env, field, options?)` on the schema.
+Owns: the per-field display policy (token → `[*****]` / `[UNSET]`
+marker, others → effective value or `(未设置)`), and the
+`FieldDisplayOptions` seam that lets callers pick the visual
+variant (e.g. padded `[ ***** ]` / `[ UNSET ]` for the
+profile-list table) without forcing the schema to know about
+padding or ANSI dimming. Replaces the 5-case
+`ui/prompt.ts#describeFieldValue` switch, the inline
+`p.env.ANTHROPIC_AUTH_TOKEN ? '[*****]' : '[UNSET]'` in
+`selectProfileFromList`, and the inline
+`profile.env.ANTHROPIC_AUTH_TOKEN ? theme.dim('[ ***** ]') :
+theme.dim('[ UNSET ]')` in `formatProfileList`. The companion
+read function is `getEffectiveFieldValue` (display-side, primary
+plus legacy fallback). **Any code that needs to render a field's
+current value as a string goes through this seam.**
+
 ### Profile Field → Env Key Mapping
 A field may own one or two env keys. The SONNET field owns both
 `ANTHROPIC_DEFAULT_SONNET_MODEL` (the slot override, primary) and
