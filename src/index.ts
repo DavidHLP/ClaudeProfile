@@ -60,6 +60,12 @@ export {
   type EnvJsonOutput,
 } from './engine/envDiff.js';
 
+// ── Backup port (filesystem in prod, in-memory in tests) ────────────
+export type { BackupStore, BackupEntry } from './services/backupStore.js';
+export { backupStore } from './services/backupStore.js';
+export { FileSystemBackupStore } from './services/fileSystemBackupStore.js';
+export { InMemoryBackupStore } from './services/inMemoryBackupStore.js';
+
 // ── Stores ──────────────────────────────────────────────────────────────
 export type { ConfigStore } from './config/configStore.js';
 export { FileSystemConfigStore } from './config/fileSystemConfigStore.js';
@@ -101,10 +107,13 @@ export {
   type DetailRow,
 } from './domain/profileSchema.js';
 
-// ── Interactive session (select-profile / confirm / execute flow) ───
+// ── Interactive session (select / confirm / execute flow) ───
 export {
+  runSelectableAction,
   runProfileAction,
   CancelledError,
+  type SelectableActionFlow,
+  type SelectableConfirmMessage,
   type ProfileActionFlow,
   type ConfirmMessage,
 } from './commands/interactiveSession.js';

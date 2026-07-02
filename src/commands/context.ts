@@ -2,8 +2,8 @@
  * Command execution context — the seam between CLI commands and the
  * collaborators they depend on.
  *
- * Why this exists
- * ---------------
+ * Why this module exists
+ * -----------------------
  * Before this module, every command in `src/commands/*.ts` directly imported
  * two module-level singletons (`profileService`, `envPresenter`) and used
  * `await import('../ui/prompt.js')` to lazy-load `inquirer`. The
@@ -26,16 +26,19 @@
  *
  * Backward compatibility
  * ----------------------
- * The legacy singletons (`profileService`, `envPresenter`) are still
- * exported from their original modules and remain the *defaults* used by
- * `createDefaultContext()`. Existing consumers of those exports are
- * unaffected. New code should depend on the interfaces, not the singletons.
+ * The legacy singletons (`profileService`, `envPresenter`, `backupStore`)
+ * are still exported from their original modules and remain the
+ * *defaults* used by `createDefaultContext()`. Existing consumers of
+ * those exports are unaffected. New code should depend on the
+ * interfaces, not the singletons.
  */
 import type { Profile, ProviderTemplate } from '../types/index.js';
 import type { EditableField } from '../types/command.js';
 import type { ProfileService } from '../services/profileService.js';
+import type { BackupStore } from '../services/backupStore.js';
 import type { EnvPresenter } from '../presenters/envRenderer.js';
 import { profileService as defaultProfileService } from '../services/profileService.js';
+import { backupStore as defaultBackupStore } from '../services/backupStore.js';
 import { envPresenter as defaultEnvPresenter } from '../presenters/envRenderer.js';
 import { realPrompts, type Prompts } from './prompts.js';
 
@@ -45,6 +48,8 @@ export { realPrompts } from './prompts.js';
 export interface CommandContext {
   /** Profile persistence + current-profile tracking. */
   readonly profiles: ProfileService;
+  /** Backup / restore port (filesystem in prod, in-memory in tests). */
+  readonly backup: BackupStore;
   /** Human-facing output formatting. */
   readonly env: EnvPresenter;
   /** Interactive prompts — replaceable for tests / headless contexts. */
@@ -61,6 +66,7 @@ export interface CommandContext {
 export function createDefaultContext(isTTY: boolean = process.stdout.isTTY): CommandContext {
   return {
     profiles: defaultProfileService,
+    backup: defaultBackupStore,
     env: defaultEnvPresenter,
     prompts: realPrompts,
     isTTY,
@@ -75,6 +81,7 @@ export function createDefaultContext(isTTY: boolean = process.stdout.isTTY): Com
  */
 export interface TestContextOverrides {
   profiles?: ProfileService;
+  backup?: BackupStore;
   env?: EnvPresenter;
   prompts?: Prompts;
   isTTY?: boolean;
@@ -83,6 +90,7 @@ export interface TestContextOverrides {
 export function createTestContext(overrides: TestContextOverrides = {}): CommandContext {
   return {
     profiles: overrides.profiles ?? defaultProfileService,
+    backup: overrides.backup ?? defaultBackupStore,
     env: overrides.env ?? defaultEnvPresenter,
     prompts: overrides.prompts ?? noopPrompts,
     isTTY: overrides.isTTY ?? false,

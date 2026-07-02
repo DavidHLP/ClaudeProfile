@@ -25,38 +25,43 @@
  * or change behavior.
  *
  * After this module:
- *   - `runProfileAction(ctx, flow)` is the single home for steps 1-6.
+ *   - `runSelectableAction<TSelected, TInput>(ctx, flow)` is the single
+ *     home for steps 1-6. `runProfileAction` is a thin alias that
+ *     fixes `TSelected` to `Profile` for the existing 7 callers.
  *   - The shape is testable as a unit: pass a fake prompts bag and a
  *     flow descriptor, assert the resulting `CommandResult`.
  *   - Cancellation is one concept (`CancelledError`) honored uniformly
  *     by `runner.toCommandResult` and the inner try/catch in
- *     `runProfileAction` itself.
- *   - Adding a new "interactive command that operates on a profile"
- *     is now ~10 lines, not ~40.
+ *     `runSelectableAction` itself.
+ *   - Adding a new "interactive command that selects from a list" is
+ *     now ~10 lines, not ~40. `restoreCommandInteractive` (which
+ *     selects from a list of backups, not profiles) is the canonical
+ *     example.
  *
- * Locality: every "select a profile, optionally confirm, then execute"
- * decision now lives here. Callers only own the bits that are actually
- * unique to their command (the empty-state message, the input builder,
- * the underlying non-interactive command).
+ * Locality: every "select, optionally confirm, then execute" decision
+ * now lives here. Callers only own the bits that are actually unique
+ * to their command (the empty-state message, the input builder, the
+ * underlying non-interactive command).
  *
  * What this module is NOT
  * -----------------------
  * This module is not a general "command runner". It is the
- * "select-profile" interactive flow. The non-interactive commands
+ * "select-from-a-list" interactive flow. The non-interactive commands
  * continue to use `runner.runCommand` for the try/catch envelope;
- * this module's `runProfileAction` is itself called from outside any
- * `runCommand` wrapper, because the function returns `CommandResult`
- * directly.
+ * this module's `runSelectableAction` is itself called from outside
+ * any `runCommand` wrapper, because the function returns
+ * `CommandResult` directly.
  */
 import { AppError } from '../errors.js';
 import { CommandResult } from '../types/command.js';
 import { Profile } from '../types/index.js';
+import inquirer from 'inquirer';
 import type { CommandContext } from './context.js';
 
 /**
  * Thrown by `buildInput` (or anywhere inside an interactive flow) to
  * signal "the user backed out of an intermediate prompt". Caught by
- * `runProfileAction`'s outer try/catch and converted to a
+ * `runSelectableAction`'s outer try/catch and converted to a
  * `{ success: false, wasCancelled: true }` result. Also honored by
  * `runner.toCommandResult` so any `runCommand`-wrapped code that
  * throws it gets the same uniform treatment.
@@ -75,19 +80,32 @@ export class CancelledError extends AppError {
 
 /**
  * A user-cancelable confirmation message. A plain string is used for
- * every-profile-the-same confirmations; a function is used when the
- * message embeds the selected profile's name or fields from the
+ * every-item-the-same confirmations; a function is used when the
+ * message embeds the selected item's name or fields from the
  * already-built input (e.g. "确定要将配置 'minimax' 重命名为 'new' 吗？").
  */
-export type ConfirmMessage<TInput> = string | ((selected: Profile, input: TInput) => string);
+export type SelectableConfirmMessage<TSelected, TInput> =
+  | string
+  | ((selected: TSelected, input: TInput) => string);
 
 /**
- * Descriptor for the "select a profile, build input, optionally confirm,
- * then execute" interactive flow.
+ * Back-compat alias for the 1-param form (`ConfirmMessage<MyInput>`)
+ * used by the 7 original `*Interactive` commands. Equivalent to
+ * `SelectableConfirmMessage<Profile, TInput>`.
+ */
+export type ConfirmMessage<TInput> = SelectableConfirmMessage<Profile, TInput>;
+
+/**
+ * Descriptor for the "select from a list, build input, optionally
+ * confirm, then execute" interactive flow.
+ *
+ * The selected item is generic: in the common case it's a `Profile`,
+ * but it can be any selectable thing (e.g. a backup path for
+ * `restoreCommandInteractive`).
  *
  * Required fields:
  *   - `verb` — the action in Chinese, used in the cancel message
- *   - `emptyMessage` — what to return when no profiles exist
+ *   - `emptyMessage` — what to return when no items exist
  *   - `buildInput` — produces the input for the underlying command;
  *     may issue additional prompts and throw `CancelledError` to back
  *     out of them
@@ -97,35 +115,56 @@ export type ConfirmMessage<TInput> = string | ((selected: Profile, input: TInput
  *   - `cancelMessage` — overrides the default `已取消${verb}。`
  *   - `confirm` — if present, the user is asked to confirm; if absent,
  *     the flow skips the confirmation step
+ *   - `list` / `formatChoice` / `currentItem` — only used when the
+ *     selected items are not profiles (e.g. backups). The default
+ *     profile flow uses `ctx.prompts.selectProfileFromList` so the
+ *     bin can swap the whole selection UI per-profile.
  */
-export interface ProfileActionFlow<TInput> {
-  /** The verb in Chinese, e.g. "删除" / "重命名" / "复制". */
+export interface SelectableActionFlow<TSelected, TInput> {
+  /** The verb in Chinese, e.g. "删除" / "重命名" / "复制" / "恢复". */
   readonly verb: string;
-  /** Returned when `ctx.profiles.listProfiles()` is empty. */
+  /** Returned when the items list is empty. */
   readonly emptyMessage: string;
   /** Optional override of the cancel message. Defaults to `已取消${verb}。`. */
   readonly cancelMessage?: string;
   /** Confirmation prompt. Omit to skip the confirmation step. */
-  readonly confirm?: ConfirmMessage<TInput>;
+  readonly confirm?: SelectableConfirmMessage<TSelected, TInput>;
+  /**
+   * How to enumerate the selectable items. Defaults to
+   * `ctx.profiles.listProfiles()` for back-compat with the profile
+   * flow. The restore flow overrides this to enumerate backups.
+   */
+  readonly list?: (ctx: CommandContext) => readonly TSelected[];
+  /**
+   * How to present a single item to the user in the inquirer list.
+   * The default is `(item) => String(item)` — fine for strings, may
+   * need overriding for richer objects.
+   */
+  readonly formatChoice?: (item: TSelected) => string;
+  /**
+   * The "current" item key, used to mark the default in the inquirer
+   * list. Defaults to `ctx.profiles.getCurrentProfile()` for the
+   * profile flow; the restore flow can pass `null` (no current
+   * backup).
+   */
+  readonly currentKey?: (ctx: CommandContext) => string | null;
   /**
    * Build the input for the non-interactive command. Receives the
-   * selected profile and the full context (for accessing prompts).
-   * Throws `CancelledError` to back out of any intermediate prompt
-   * (`promptForNewName`, `inputApiToken`, etc.) — `runProfileAction`
-   * catches it and returns a uniform cancellation result.
+   * selected item and the full context (for accessing prompts).
+   * Throws `CancelledError` to back out of any intermediate prompt.
    */
-  readonly buildInput: (selected: Profile, ctx: CommandContext) => TInput | Promise<TInput>;
+  readonly buildInput: (selected: TSelected, ctx: CommandContext) => TInput | Promise<TInput>;
   /** The non-interactive command to delegate to once the input is built. */
   readonly execute: (ctx: CommandContext, input: TInput) => Promise<CommandResult>;
 }
 
 /**
- * The "select a profile, build input, optionally confirm, then execute"
+ * The "select from a list, build input, optionally confirm, then execute"
  * flow.
  *
  * Failure modes:
- *   - No profiles exist → returns `{ success: false, error: emptyMessage }`.
- *   - User backs out of the profile selection → returns
+ *   - No items exist → returns `{ success: false, error: emptyMessage }`.
+ *   - User backs out of the selection → returns
  *     `{ success: false, error: cancelMessage ?? `已取消${verb}。`,
  *        wasCancelled: true }`.
  *   - User backs out of the confirmation → same shape as above.
@@ -141,12 +180,12 @@ export interface ProfileActionFlow<TInput> {
  *     Most often this is a `{ success: true, output }` from the
  *     underlying non-interactive command.
  */
-export async function runProfileAction<TInput>(
+export async function runSelectableAction<TSelected, TInput>(
   ctx: CommandContext,
-  flow: ProfileActionFlow<TInput>
+  flow: SelectableActionFlow<TSelected, TInput>
 ): Promise<CommandResult> {
   try {
-    return await runProfileActionImpl(ctx, flow);
+    return await runSelectableActionImpl(ctx, flow);
   } catch (err) {
     if (err instanceof CancelledError) {
       return {
@@ -159,31 +198,69 @@ export async function runProfileAction<TInput>(
   }
 }
 
-async function runProfileActionImpl<TInput>(
+async function runSelectableActionImpl<TSelected, TInput>(
   ctx: CommandContext,
-  flow: ProfileActionFlow<TInput>
+  flow: SelectableActionFlow<TSelected, TInput>
 ): Promise<CommandResult> {
   // 1. List & check empty.
-  const profiles = ctx.profiles.listProfiles();
-  if (profiles.length === 0) {
+  const listFn = flow.list ?? (() => ctx.profiles.listProfiles() as unknown as readonly TSelected[]);
+  const items = listFn(ctx);
+  if (items.length === 0) {
     return { success: false, error: flow.emptyMessage };
   }
 
-  // 2. Select from list.
-  const currentProfileName = ctx.profiles.getCurrentProfile();
-  const selectedName = await ctx.prompts.selectProfileFromList(profiles, currentProfileName);
-  if (!selectedName) {
-    throw new CancelledError(flow.verb);
+  // 2. Select from list. For the default (profile) flow, we route
+  //    through `ctx.prompts.selectProfileFromList` so the bin can
+  //    swap the whole selection UI. For other flows (e.g. backup
+  //    restore), we render a generic inquirer list inline.
+  let selectedKey: string;
+  if (flow.list === undefined) {
+    const profiles = items as unknown as readonly Profile[];
+    const profileName = await ctx.prompts.selectProfileFromList(
+      profiles as Profile[],
+      ctx.profiles.getCurrentProfile()
+    );
+    if (!profileName) {
+      throw new CancelledError(flow.verb);
+    }
+    selectedKey = profileName;
+  } else {
+    const format = flow.formatChoice ?? ((item: TSelected) => String(item));
+    const currentKey = flow.currentKey ? flow.currentKey(ctx) : null;
+    const choices = items.map((item) => ({
+      name: format(item),
+      value: String(item),
+    }));
+    const defaultIndex =
+      currentKey === null ? 0 : Math.max(0, choices.findIndex((c) => c.value === currentKey));
+    const { selected } = await inquirer.prompt({
+      type: 'list',
+      name: 'selected',
+      message: `请选择要${flow.verb}的项:`,
+      choices,
+      default: defaultIndex,
+    });
+    if (!selected) {
+      throw new CancelledError(flow.verb);
+    }
+    selectedKey = String(selected);
   }
 
-  // The name was just returned from `selectProfileFromList`, which
-  // promises to return one of `profiles[i].name`. We re-derive the
-  // full profile object so the caller can use it in `buildInput`.
-  const selected = profiles.find((p) => p.name === selectedName);
-  if (!selected) {
+  // The key was just returned from the inquirer list. For the
+  // default profile flow, `selectProfileFromList` returns the
+  // profile's `name`; for custom flows, the inquirer choice value
+  // is `String(item)`. We match by `name` for the profile flow
+  // and fall back to `String(item)` for everything else.
+  const selected: TSelected | undefined =
+    flow.list === undefined
+      ? ((items as unknown as readonly Profile[]).find(
+          (p) => (p as Profile).name === selectedKey
+        ) as unknown as TSelected | undefined)
+      : items.find((it) => String(it) === selectedKey);
+  if (selected === undefined) {
     // Defensive: should be unreachable.
     throw new AppError(
-      `Internal error: selected profile '${selectedName}' is not in the list`,
+      `Internal error: selected item '${selectedKey}' is not in the list`,
       'INTERNAL_ERROR'
     );
   }
@@ -191,7 +268,7 @@ async function runProfileActionImpl<TInput>(
   // 3. Build input (may include additional prompts that throw CancelledError).
   const input = await flow.buildInput(selected, ctx);
 
-  // 4. Optional confirmation (has access to both selected profile and built input).
+  // 4. Optional confirmation (has access to both selected item and built input).
   if (flow.confirm) {
     const message = typeof flow.confirm === 'function' ? flow.confirm(selected, input) : flow.confirm;
     const confirmed = await ctx.prompts.confirmAction(message);
@@ -203,3 +280,24 @@ async function runProfileActionImpl<TInput>(
   // 5. Delegate to the non-interactive command.
   return flow.execute(ctx, input);
 }
+
+// ── Back-compat surface ──────────────────────────────────────────────────
+
+/**
+ * Back-compat alias: the original `runProfileAction` is `runSelectableAction`
+ * with `TSelected` fixed to `Profile`. New code should use
+ * `runSelectableAction<Profile, TInput>`; this alias exists so the
+ * 7 existing `*Interactive` commands keep their `runProfileAction` import.
+ */
+export async function runProfileAction<TInput>(
+  ctx: CommandContext,
+  flow: Omit<SelectableActionFlow<Profile, TInput>, 'list' | 'formatChoice' | 'currentKey'>
+): Promise<CommandResult> {
+  return runSelectableAction<Profile, TInput>(ctx, flow);
+}
+
+/**
+ * Back-compat alias: the original `ProfileActionFlow` is
+ * `SelectableActionFlow` with `TSelected` fixed to `Profile`.
+ */
+export type ProfileActionFlow<TInput> = SelectableActionFlow<Profile, TInput>;
