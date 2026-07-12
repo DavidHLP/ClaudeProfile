@@ -25,6 +25,7 @@ export async function createCommand(ctx: CommandContext, input: CreateProfileInp
       sonnetModel: input.sonnetModel,
       opusModel: input.opusModel,
       haikuModel: input.haikuModel,
+      effortLevel: input.effortLevel,
     }, input.profileName);
 
     ctx.profiles.saveProfile(profile);
@@ -57,6 +58,13 @@ export async function createCommandInteractive(ctx: CommandContext): Promise<Com
   const haikuModel = await ctx.prompts.inputProfileField('haikuModel', {
     defaultValue: defaultFieldValue(provider.envTemplate, 'haikuModel', provider.defaultModel),
   });
+  // EFFORT is a profile-global value (not per-model). Default to whatever the
+  // provider template carries (e.g. baseEnvTemplate gives 'max') so a user
+  // building a new profile inherits the project's recommended setting; they
+  // can still pick another level here.
+  const effortLevel = await ctx.prompts.inputProfileEffort(
+    provider.envTemplate.CLAUDE_CODE_EFFORT_LEVEL,
+  );
 
   return createCommand(ctx, {
     providerId: provider.id,
@@ -66,5 +74,6 @@ export async function createCommandInteractive(ctx: CommandContext): Promise<Com
     sonnetModel,
     opusModel,
     haikuModel,
+    effortLevel,
   });
 }

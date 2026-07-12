@@ -115,6 +115,7 @@ export const noopPrompts: Prompts = {
   inputProfileName: async () => '',
   promptForNewName: async () => null,
   inputProfileField: async () => '',
+  inputProfileEffort: async () => 'max',
   selectEditField: async (_profile: Profile) => null as EditableField | null,
   selectBackup: async () => null,
   confirmAction: async () => false,

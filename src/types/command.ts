@@ -4,6 +4,12 @@ export interface ProfileCredentialsInput {
   sonnetModel: string;
   opusModel: string;
   haikuModel: string;
+  /**
+   * Optional. Defaults to `baseEnvTemplate.CLAUDE_CODE_EFFORT_LEVEL`
+   * (currently `'max'`) inside `materializeProfile` when omitted, so
+   * older callers that pass only the 5 first-class fields keep working.
+   */
+  effortLevel?: string;
 }
 
 export interface CreateProfileInput extends ProfileCredentialsInput {

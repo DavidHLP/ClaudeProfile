@@ -138,6 +138,12 @@ export function materializeProfile(
     sonnetModel: string;
     opusModel: string;
     haikuModel: string;
+    /**
+     * Optional. Defaults to the provider's `envTemplate.CLAUDE_CODE_EFFORT_LEVEL`
+     * (or `'max'` if absent) so older callers that pass only the 5
+     * first-class fields keep working unchanged.
+     */
+    effortLevel?: string;
   },
   profileName: string
 ): Profile {
@@ -151,6 +157,12 @@ export function materializeProfile(
   env = applyField(env, 'sonnetModel', input.sonnetModel);
   env = applyField(env, 'opusModel', input.opusModel);
   env = applyField(env, 'haikuModel', input.haikuModel);
+  // Resolve the EFFORT default from the provider template (which already
+  // carries baseEnvTemplate.CLAUDE_CODE_EFFORT_LEVEL for every built-in
+  // provider including 'custom'); fall back to 'max' for synthetic test
+  // providers that omit it.
+  const effort = input.effortLevel ?? provider.envTemplate.CLAUDE_CODE_EFFORT_LEVEL ?? 'max';
+  env = applyField(env, 'effortLevel', effort);
 
   return {
     name: profileName,

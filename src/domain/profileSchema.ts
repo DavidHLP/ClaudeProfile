@@ -74,7 +74,8 @@ export type ProfileField =
   | 'token'
   | 'sonnetModel'
   | 'opusModel'
-  | 'haikuModel';
+  | 'haikuModel'
+  | 'effortLevel';
 
 /**
  * Canonical display order. Anything that walks the fields for display
@@ -88,7 +89,17 @@ export const PROFILE_FIELDS_ORDER: readonly ProfileField[] = [
   'sonnetModel',
   'opusModel',
   'haikuModel',
+  'effortLevel',
 ];
+
+/**
+ * Allowed values for `CLAUDE_CODE_EFFORT_LEVEL`. Exported so the
+ * create/edit prompts and the per-field validator can share the same
+ * canonical list — adding a 5th value here propagates to the UI and
+ * the schema in one place.
+ */
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const;
+export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 export interface FieldSpec {
   readonly id: ProfileField;
@@ -163,15 +174,33 @@ export const PROFILE_FIELDS: Readonly<Record<ProfileField, FieldSpec>> = {
     sensitive: false,
     validateInput: (value) => (!value.trim() ? '模型名称不能为空' : true),
   },
+  effortLevel: {
+    id: 'effortLevel',
+    // Profile 单一 effort 字段（不分 sonnet/opus/haiku）—— CLAUDE_CODE_EFFORT_LEVEL
+    // 是 env var 优先级最高的全局设置，max 经 env var 持久，绕过 /effort 的
+    // session-only 限制。配合 CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1（已在 baseEnvTemplate）
+    // 走第三方 provider 也确保 effort 参数实际下发。
+    label: 'EFFORT 等级',
+    envKeys: ['CLAUDE_CODE_EFFORT_LEVEL'],
+    required: false,
+    sensitive: false,
+    validateInput: (value) => {
+      const v = value.trim();
+      return (EFFORT_LEVELS as readonly string[]).includes(v)
+        ? true
+        : `EFFORT 必须是 ${EFFORT_LEVELS.join('/')} 之一`;
+    },
+  },
 };
 
 /**
- * The 6-row per-profile detail panel. Derived from `PROFILE_FIELDS` so
+ * The 7-row per-profile detail panel. Derived from `PROFILE_FIELDS` so
  * a single field with 2 env keys (e.g. SONNET) gets 2 display rows.
  *
  * Order is: BASE URL, TOKEN, MODEL (legacy), SONNET (slot override),
- * OPUS, HAIKU. This matches the original `formatProfileDetail` order
- * 1:1, so the visible UX is unchanged.
+ * OPUS, HAIKU, EFFORT. The first 6 match the original `formatProfileDetail`
+ * order 1:1; EFFORT is appended at the end so the visible UX for the
+ * 5 pre-existing fields is unchanged.
  */
 export interface DisplayRowSpec {
   readonly field: ProfileField;
@@ -187,6 +216,7 @@ export const PROFILE_DISPLAY_ROWS: readonly DisplayRowSpec[] = [
   { field: 'sonnetModel', envKey: 'ANTHROPIC_DEFAULT_SONNET_MODEL', shortLabel: 'SONNET' },
   { field: 'opusModel', envKey: 'ANTHROPIC_DEFAULT_OPUS_MODEL', shortLabel: 'OPUS' },
   { field: 'haikuModel', envKey: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', shortLabel: 'HAIKU' },
+  { field: 'effortLevel', envKey: 'CLAUDE_CODE_EFFORT_LEVEL', shortLabel: 'EFFORT' },
 ];
 
 /**

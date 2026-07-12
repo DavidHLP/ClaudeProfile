@@ -25,7 +25,7 @@
 import inquirer from 'inquirer';
 import { Profile, ProviderTemplate } from '../types/index.js';
 import { EditableField, EDITABLE_FIELD_LABELS } from '../types/command.js';
-import { formatFieldDisplayValue } from '../domain/profileSchema.js';
+import { EFFORT_LEVELS, PROFILE_FIELDS_ORDER, formatFieldDisplayValue } from '../domain/profileSchema.js';
 import { icon, theme, padVisualEnd, stripAnsi } from './theme.js';
 
 export async function promptInput(options: {
@@ -124,19 +124,23 @@ export async function selectBackup(backups: { name: string; path: string; date: 
 
 /**
  * Edit-field selection for a profile. Walks the canonical
- * `EditableField` list (which is the schema's `ProfileField` union
- * under a back-compat alias) and renders each as
+ * `PROFILE_FIELDS_ORDER` list (which is the schema's `ProfileField`
+ * display order) and renders each as
  *   `<label>  <current-value>`.
+ *
+ * Iterating from the schema rather than a hardcoded list keeps the
+ * edit menu in lock-step with the schema: adding a field to
+ * `PROFILE_FIELDS` automatically surfaces it in `edit`. The
+ * `selectEffortLevel` prompt is reached when the user picks the
+ * EFFORT row; the dispatch lives in `commands/edit.ts`.
  *
  * The current-value display is delegated to the schema's
  * `formatFieldDisplayValue` so the per-field display policy
  * (token → `[*****]`, others → effective value or `(未设置)`) lives
- * in one place. The previous `describeFieldValue` pass-through
- * helper was removed: the schema's function is the single home
- * for "what string do I show next to this field's label?".
+ * in one place.
  */
 export async function selectEditField(profile: Profile): Promise<EditableField | null> {
-  const fields: EditableField[] = ['token', 'baseUrl', 'sonnetModel', 'opusModel', 'haikuModel'];
+  const fields: EditableField[] = [...PROFILE_FIELDS_ORDER];
 
   const labelWidth = Math.max(...fields.map((f) => stripAnsi(EDITABLE_FIELD_LABELS[f]).length));
 
@@ -160,6 +164,46 @@ export async function selectEditField(profile: Profile): Promise<EditableField |
   });
 
   return field as EditableField | null;
+}
+
+/**
+ * Effort level selector. Lists the four `EFFORT_LEVELS` in ascending
+ * intensity, with a per-choice annotation showing what the level means
+ * so the user can pick without consulting docs.
+ *
+ * `defaultValue` is matched case-insensitively against the canonical
+ * `EFFORT_LEVELS`; unknown / missing values fall back to `max` so the
+ * user always sees a sensible highlighted choice.
+ */
+export async function selectEffortLevel(defaultValue?: string): Promise<string> {
+  const fallback = 'max';
+  const normalized = defaultValue?.trim().toLowerCase();
+  const defaultEffort = (EFFORT_LEVELS as readonly string[]).includes(normalized ?? '')
+    ? (normalized as string)
+    : fallback;
+
+  const annotation: Record<string, string> = {
+    low: '（节能/快）',
+    medium: '（平衡）',
+    high: '（深入）',
+    max: '（最强/默认）',
+  };
+
+  const choices = EFFORT_LEVELS.map((level) => ({
+    name: `${level.padEnd(7)} ${theme.dim(annotation[level] ?? '')}`,
+    value: level,
+  }));
+
+  const { effort } = await inquirer.prompt({
+    type: 'list',
+    name: 'effort',
+    message: 'EFFORT 等级（决定 Claude Code 推理深度）:',
+    choices,
+    default: defaultEffort,
+    pageSize: 6,
+  });
+
+  return effort as string;
 }
 
 // Re-export the icon set so embedders that used to reach into
