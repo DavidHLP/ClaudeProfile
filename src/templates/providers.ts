@@ -104,7 +104,12 @@ export const providerTemplates: ProviderTemplate[] = [
     description: '手动配置所有参数',
     defaultBaseUrl: '',
     defaultModel: '',
-    envTemplate: {},
+    // 自定义模式同样继承 baseEnvTemplate：
+    // 1) 与其他 provider 行为一致（CLAUDE_CODE_EFFORT_LEVEL=max 等基线键进 profile.env）
+    // 2) profile 可移植：拷贝到别处仍带 max effort 默认
+    // 3) 避免未来 envDiff 清理"多余" CLAUDE_CODE_* 键时静默丢失 max
+    // 模型槽位由用户在 create 时手填，这里不预设 ANTHROPIC_DEFAULT_*_MODEL。
+    envTemplate: { ...baseEnvTemplate },
   },
 ];
 

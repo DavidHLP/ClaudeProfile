@@ -2,13 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { providerTemplates } from '../src/templates/providers.js';
 import { baseEnvTemplate } from '../src/templates/baseEnvTemplate.js';
 
-// 派生：所有非 custom 的内置 provider。custom 没有模型槽位，不参与 base 继承验证。
-const BUILT_IN_IDS = providerTemplates.map((p) => p.id).filter((id) => id !== 'custom');
+// 所有内置 provider（包括 custom）都必须继承 baseEnvTemplate，
+// 以保证 CLAUDE_CODE_EFFORT_LEVEL=max 等基线键在 profile.env 中持久存在。
+const BUILT_IN_IDS = providerTemplates.map((p) => p.id);
 
 describe('baseEnvTemplate inheritance', () => {
   for (const id of BUILT_IN_IDS) {
     describe(`provider "${id}"`, () => {
       const provider = providerTemplates.find((p) => p.id === id);
+      const isCustom = id === 'custom';
 
       it('is registered in the built-in list', () => {
         expect(provider).toBeDefined();
@@ -22,6 +24,13 @@ describe('baseEnvTemplate inheritance', () => {
       });
 
       it('still sets Opus/Sonnet/Haiku model slots', () => {
+        // custom 模式模型槽位由用户在 create 时手填，provider.envTemplate 不预设。
+        if (isCustom) {
+          expect(provider?.envTemplate.ANTHROPIC_DEFAULT_OPUS_MODEL).toBeUndefined();
+          expect(provider?.envTemplate.ANTHROPIC_DEFAULT_SONNET_MODEL).toBeUndefined();
+          expect(provider?.envTemplate.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBeUndefined();
+          return;
+        }
         expect(provider).toBeDefined();
         expect(provider?.envTemplate.ANTHROPIC_DEFAULT_OPUS_MODEL).toBeDefined();
         expect(provider?.envTemplate.ANTHROPIC_DEFAULT_SONNET_MODEL).toBeDefined();
