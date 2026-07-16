@@ -199,8 +199,8 @@ claude-profile completion fish > ~/.config/fish/completions/claude-profile.fish
 | `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` | `1` | 关闭实验性 beta |
 | `API_TIMEOUT_MS` | `3000000` | 50 分钟超时窗口 |
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 关闭非必要流量上报 |
-| `CLAUDE_CODE_EFFORT_LEVEL` | `max` | 默认最高 effort（env var 优先级最高，可持久） |
-| `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` | `1` | 第三方 provider / 自定义模型 ID 时强制发送 effort 参数（必需，否则 `effort=max` 不生效） |
+| `CLAUDE_CODE_EFFORT_LEVEL` | `ultracode` | 默认最高 effort（env var 优先级最高，可持久） |
+| `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` | `1` | 第三方 provider / 自定义模型 ID 时强制发送 effort 参数（必需，否则 `effort=ultracode` 不生效） |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `75` | 在 autocompact 窗口 75% 时触发压缩（更早压缩；仅主动压缩场景生效，扩展上下文需配合 `CLAUDE_CODE_AUTO_COMPACT_WINDOW`） |
 
 - 不覆盖：已在 shell 中设置的同名变量不会被覆盖（仅未设置时才注入默认值）。

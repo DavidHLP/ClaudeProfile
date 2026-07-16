@@ -125,7 +125,7 @@ describe('shellHook renderers', () => {
     // 1:1 string match, so reviewers must read the diff manually.
     const out = renderShellHook();
     expect(hash(out)).toMatchInlineSnapshot(
-      '"decef8beda704f49"'
+      '"02a2b130e551230c"'
     );
   });
 });

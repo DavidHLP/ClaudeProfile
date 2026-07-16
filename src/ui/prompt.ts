@@ -167,16 +167,16 @@ export async function selectEditField(profile: Profile): Promise<EditableField |
 }
 
 /**
- * Effort level selector. Lists the four `EFFORT_LEVELS` in ascending
+ * Effort level selector. Lists the five `EFFORT_LEVELS` in ascending
  * intensity, with a per-choice annotation showing what the level means
  * so the user can pick without consulting docs.
  *
  * `defaultValue` is matched case-insensitively against the canonical
- * `EFFORT_LEVELS`; unknown / missing values fall back to `max` so the
+ * `EFFORT_LEVELS`; unknown / missing values fall back to `ultracode` so the
  * user always sees a sensible highlighted choice.
  */
 export async function selectEffortLevel(defaultValue?: string): Promise<string> {
-  const fallback = 'max';
+  const fallback = 'ultracode';
   const normalized = defaultValue?.trim().toLowerCase();
   const defaultEffort = (EFFORT_LEVELS as readonly string[]).includes(normalized ?? '')
     ? (normalized as string)
@@ -186,7 +186,8 @@ export async function selectEffortLevel(defaultValue?: string): Promise<string> 
     low: '（节能/快）',
     medium: '（平衡）',
     high: '（深入）',
-    max: '（最强/默认）',
+    max: '（最强）',
+    ultracode: '（极致/默认）',
   };
 
   const choices = EFFORT_LEVELS.map((level) => ({

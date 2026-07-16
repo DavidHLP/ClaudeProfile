@@ -3,7 +3,7 @@ import { providerTemplates } from '../src/templates/providers.js';
 import { baseEnvTemplate } from '../src/templates/baseEnvTemplate.js';
 
 // 所有内置 provider（包括 custom）都必须继承 baseEnvTemplate，
-// 以保证 CLAUDE_CODE_EFFORT_LEVEL=max 等基线键在 profile.env 中持久存在。
+// 以保证 CLAUDE_CODE_EFFORT_LEVEL=ultracode 等基线键在 profile.env 中持久存在。
 const BUILT_IN_IDS = providerTemplates.map((p) => p.id);
 
 describe('baseEnvTemplate inheritance', () => {

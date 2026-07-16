@@ -98,7 +98,7 @@ export const PROFILE_FIELDS_ORDER: readonly ProfileField[] = [
  * canonical list — adding a 5th value here propagates to the UI and
  * the schema in one place.
  */
-export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const;
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max', 'ultracode'] as const;
 export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 export interface FieldSpec {
@@ -177,7 +177,7 @@ export const PROFILE_FIELDS: Readonly<Record<ProfileField, FieldSpec>> = {
   effortLevel: {
     id: 'effortLevel',
     // Profile 单一 effort 字段（不分 sonnet/opus/haiku）—— CLAUDE_CODE_EFFORT_LEVEL
-    // 是 env var 优先级最高的全局设置，max 经 env var 持久，绕过 /effort 的
+    // 是 env var 优先级最高的全局设置，ultracode 经 env var 持久，绕过 /effort 的
     // session-only 限制。配合 CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1（已在 baseEnvTemplate）
     // 走第三方 provider 也确保 effort 参数实际下发。
     label: 'EFFORT 等级',

@@ -35,9 +35,9 @@ export async function editCommand(ctx: CommandContext, input: EditProfileInput):
  * value as the default. This helper is the single bridge between
  * the edit command and the schema-backed prompt surface.
  *
- * Exception: `effortLevel` uses a 4-option select prompt rather than
+ * Exception: `effortLevel` uses a 5-option select prompt rather than
  * a free-text input — the values are a closed set
- * (`low`/`medium`/`high`/`max`) and asking the user to type the value
+ * (`low`/`medium`/`high`/`max`/`ultracode`) and asking the user to type the value
  * would be the wrong UI. The dispatch lives here because the schema
  * keeps a single "what env keys does this field own" contract and the
  * UI shape is a per-prompt concern, not a per-field one.

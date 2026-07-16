@@ -59,7 +59,7 @@ export async function createCommandInteractive(ctx: CommandContext): Promise<Com
     defaultValue: defaultFieldValue(provider.envTemplate, 'haikuModel', provider.defaultModel),
   });
   // EFFORT is a profile-global value (not per-model). Default to whatever the
-  // provider template carries (e.g. baseEnvTemplate gives 'max') so a user
+  // provider template carries (e.g. baseEnvTemplate gives 'ultracode') so a user
   // building a new profile inherits the project's recommended setting; they
   // can still pick another level here.
   const effortLevel = await ctx.prompts.inputProfileEffort(
