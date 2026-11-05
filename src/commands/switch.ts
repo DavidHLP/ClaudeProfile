@@ -1,89 +1,71 @@
-import { profileService } from '../services/profileService.js';
-import { settingsSyncService, createSettingsSyncService } from '../services/settingsSyncService.js';
-import { envPresenter, buildSwitchCommands } from '../presenters/envPresenter.js';
+import { buildSwitchCommands } from '../engine/envDiff.js';
 import { SwitchProfileInput, CommandResult } from '../types/command.js';
-import { runCommand } from './runner.js';
 import { resolveOldEnv } from '../engine/activation.js';
-import { isValidSettingsScope } from '../config/claudeSettingsStore.js';
-import type { SettingsScope } from '../config/claudeSettingsStore.js';
-import { AppError } from '../errors.js';
+import { runCommand } from './runner.js';
+import type { CommandContext } from './context.js';
+import { runProfileAction } from './interactiveSession.js';
 
-export async function switchCommand(input: SwitchProfileInput, isTTY: boolean = process.stdout.isTTY): Promise<CommandResult> {
+export async function switchCommand(ctx: CommandContext, input: SwitchProfileInput): Promise<CommandResult> {
   return runCommand('切换配置', async () => {
-    const currentProfileName = profileService.getCurrentProfile();
-    const oldEnv = resolveOldEnv(profileService, currentProfileName, input.profileName);
+    const currentProfileName = ctx.profiles.getCurrentProfile();
+    const oldEnv = resolveOldEnv(ctx.profiles, currentProfileName, input.profileName);
 
-    const profile = profileService.getProfile(input.profileName);
+    const profile = ctx.profiles.getProfile(input.profileName);
 
     if (input.dryRun) {
-      const scope = input.scope || 'user';
       return {
         success: true,
-        output: `【dry-run】将切换配置 '${input.profileName}'\nscope: ${scope}\n环境变量: ${Object.keys(profile.env).join(', ')}`,
+        output: `【dry-run】将切换配置 '${input.profileName}'\n环境变量: ${Object.keys(profile.env).join(', ')}`,
       };
     }
 
-    profileService.setCurrentProfile(input.profileName);
+    ctx.profiles.setCurrentProfile(input.profileName);
 
-    const syncToSettings = input.syncToSettings ?? true;
-    let syncWarning: string | undefined;
-    if (syncToSettings) {
-      let scope: SettingsScope | undefined;
-      if (input.scope) {
-        if (!isValidSettingsScope(input.scope)) {
-          throw new AppError(`无效的 scope: "${input.scope}". 有效值为: user, project, local`, 'INVALID_SCOPE');
-        }
-        scope = input.scope;
-      }
-      const syncService = scope ? createSettingsSyncService(scope) : settingsSyncService;
-      const syncResult = syncService.syncOnSwitch(oldEnv, profile.env);
-      if (!syncResult.success && syncResult.warning) {
-        syncWarning = syncResult.warning;
-      }
-    }
-
-    const output = isTTY
-      ? envPresenter.formatSwitchSuccess(input.profileName, profile.env)
+    // TTY → banner; non-TTY → pure `export`/`unset` lines for the
+    // shell-hook's safe-eval bridge to inject into the current shell.
+    const output = ctx.isTTY
+      ? ctx.env.formatSwitchSuccess(input.profileName, profile.env)
       : buildSwitchCommands(oldEnv, profile.env);
 
-    if (syncWarning) {
-      return { success: true, output: `${output}\n\n${envPresenter.formatWarning(syncWarning)}` };
-    }
     return { success: true, output };
   });
 }
 
-export async function switchCommandInteractive(): Promise<CommandResult> {
-  const { selectProfileFromList } = await import('../ui/prompt.js');
-
-  const profiles = profileService.listProfiles();
+export async function switchCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
+  // Pre-flight that is *not* about list selection: 0 profiles is its
+  // own message (and doesn't need the banner). Everything else —
+  // the single-profile shortcut, the prompt, the "save previous
+  // profile" side effect, and the dispatch to `switchCommand` —
+  // goes through the `runProfileAction` seam.
+  const profiles = ctx.profiles.listProfiles();
   if (profiles.length === 0) {
     return { success: false, error: '没有可用的配置。请先使用 create 命令创建配置。' };
   }
 
-  const currentProfile = profileService.getCurrentProfile();
+  // TTY banner is part of the interactive UX; the standard flow
+  // would otherwise just show the "select profile" prompt.
+  console.log(ctx.env.formatBanner());
 
-  // 输出 banner
-  console.log(envPresenter.formatBanner());
-
-  // 如果只有一个配置且已是当前配置，无需操作
-  if (profiles.length === 1 && profiles[0].name === currentProfile) {
-    return switchCommand({ profileName: currentProfile });
-  }
-
-  const selectedName = await selectProfileFromList(profiles, currentProfile);
-
-  if (!selectedName) {
-    return { success: false, error: '已取消切换。', wasCancelled: true };
-  }
-
-  // 如果选择的就是当前配置，仅切换本地配置，不同步到 settings.json
-  if (selectedName === currentProfile) {
-    return switchCommand({ profileName: selectedName });
-  }
-
-  // Save old profile name for diff in export --current
-  profileService.setPreviousProfile(currentProfile);
-
-  return switchCommand({ profileName: selectedName });
+  const currentProfile = ctx.profiles.getCurrentProfile();
+  return runProfileAction<SwitchProfileInput>(ctx, {
+    verb: '切换',
+    emptyMessage: '没有可用的配置。请先使用 create 命令创建配置。',
+    // The seam's pre-flight: when there's exactly one profile and
+    // it's already the current one, skip the prompt entirely. This
+    // replaces the hand-rolled `profiles.length === 1 && profiles[0].name === currentProfile`
+    // pre-flight that used to live here. The `currentKey` default
+    // (active profile) is supplied by `runProfileAction`, so the
+    // single-item shortcut is keyed off the active profile name
+    // for free.
+    skipSelectionWhenSingleMatch: true,
+    buildInput: async (selected, c) => {
+      // Save the old profile name so `export --current` can diff
+      // against it on the next call. `switchCommand` itself does
+      // not touch the previous-profile marker; only this
+      // interactive entry does.
+      c.profiles.setPreviousProfile(currentProfile);
+      return { profileName: selected.name };
+    },
+    execute: switchCommand,
+  });
 }

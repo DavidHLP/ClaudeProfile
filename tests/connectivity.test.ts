@@ -1,8 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { EnvConfig } from '../src/types/index.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiConnectivityError } from '../src/utils/connectivity.js';
-import { SettingsSyncServiceImpl } from '../src/services/settingsSyncService.js';
-import type { ClaudeSettingsStore } from '../src/config/claudeSettingsStore.js';
 
 describe('API Connectivity Detection', () => {
   let originalFetch: typeof fetch;
@@ -113,78 +110,5 @@ describe('ApiConnectivityError', () => {
     });
     expect(error.code).toBe('API_CONNECTIVITY_ERROR');
     expect(error.name).toBe('ApiConnectivityError');
-  });
-});
-
-describe('SettingsSyncService Error Handling', () => {
-  let mockStore: ClaudeSettingsStore;
-  let service: SettingsSyncServiceImpl;
-
-  beforeEach(() => {
-    mockStore = {
-      readEnv: vi.fn().mockReturnValue({}),
-      writeEnv: vi.fn().mockImplementation(() => {
-        throw new Error('Permission denied');
-      }),
-    } as unknown as ClaudeSettingsStore;
-
-    service = new SettingsSyncServiceImpl(mockStore);
-  });
-
-  it('throws error when sync fails in strict mode', () => {
-    const env: EnvConfig = {
-      ANTHROPIC_AUTH_TOKEN: 'test-token',
-    };
-
-    expect(() => {
-      service.syncOnSwitch(null, env, { errorStrategy: 'strict' });
-    }).toThrow('Permission denied');
-  });
-
-  it('returns result with warning when sync fails in warn mode', () => {
-    const env: EnvConfig = {
-      ANTHROPIC_AUTH_TOKEN: 'test-token',
-    };
-
-    const result = service.syncOnSwitch(null, env, { errorStrategy: 'warn' });
-
-    expect(result).toEqual({
-      success: false,
-      warning: '同步 settings.json 失败: Permission denied',
-    });
-  });
-
-  it('continues silently when sync fails in silent mode', () => {
-    const env: EnvConfig = {
-      ANTHROPIC_AUTH_TOKEN: 'test-token',
-    };
-
-    const result = service.syncOnSwitch(null, env, { errorStrategy: 'silent' });
-
-    expect(result).toEqual({ success: false });
-    expect(mockStore.writeEnv).toHaveBeenCalled();
-  });
-
-  it('uses warn as default strategy', () => {
-    const env: EnvConfig = {
-      ANTHROPIC_AUTH_TOKEN: 'test-token',
-    };
-
-    const result = service.syncOnSwitch(null, env);
-
-    expect(result.success).toBe(false);
-    expect(result.warning).toContain('Permission denied');
-  });
-
-  it('returns success when sync succeeds', () => {
-    mockStore.writeEnv = vi.fn().mockReturnValue(undefined);
-
-    const env: EnvConfig = {
-      ANTHROPIC_AUTH_TOKEN: 'test-token',
-    };
-
-    const result = service.syncOnSwitch(null, env);
-
-    expect(result).toEqual({ success: true });
   });
 });

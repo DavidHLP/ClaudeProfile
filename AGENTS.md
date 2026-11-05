@@ -57,25 +57,23 @@ Source layout: `src/{commands,config,engine,presenters,services,templates,types,
 - Presenter layer uses raw ANSI escape codes (not chalk). `padEnd()` does not handle ANSI sequences — use a `stripAnsi` helper before computing visual padding.
 - Avoid pairing a custom ANSI table with `inquirer` list prompts; this creates a "dual UI" where the table looks interactive but isn't. Either make the table itself interactive or embed all info into the inquirer choices.
 
-## Codex Settings Sync
+## Shell 环境变量注入（Eval Bridge）
 
-- `settingsSyncService` syncs profile env vars to `~/.Codex/settings.json`
-- Works with both VSCode and Zed Codex extensions
-- `MANAGED_SETTINGS_KEYS` in `src/engine/settingsSync.ts` defines synced keys:
-  - `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`
-  - `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_{HAIKU,SONNET,OPUS}_MODEL`
-  - `CLAUDE_CODE_SUBAGENT_MODEL`
+- 环境变量通过 shell hook 注入当前 shell，**不写入 `~/.Codex/settings.json`**
+- `eval "$(Codex-profile init)"` 注册 shell function，拦截 `switch` 命令并 `eval` 其输出的 `export`/`unset` 命令
+- 注入的 key 来自 profile.env（任意键，如 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL` 等）
+- 安全：`safe_eval` 只 eval 匹配 `export KEY='val'` / `unset KEY` 的行，其余跳过
 
 ## Config Locations
 
 - Profiles: `~/.config/Codex-profile/`
-- Codex settings: `~/.Codex/settings.json`
+- 环境变量注入：当前 shell（通过 shell hook），**不写入 `~/.Codex/settings.json`**
 
 ## Runtime Notes
 
 - `Codex-profile` is installed globally (`npm link` or `npm i -g`). It can be invoked from any directory, not just the repo root.
 - **npm link workaround** — If `npm link` succeeds but the command isn't found, npm prefix may be redirected (e.g. Zed). Manually symlink: `ln -sf $(pwd)/bin/Codex-profile.js ~/.local/bin/Codex-profile && chmod +x ~/.local/bin/Codex-profile`
-- **调试 CLI**: 直接 `node bin/Codex-profile.js <command>` 避开全局安装链路;改完 `src/` 必须 `npm run build`,因为 bin 引用 `dist/`
+- **调试 CLI**: 直接 `node bin/Codex-profile.js <command>` 避开全球安装链路;改完 `src/` 必须 `npm run build`,因为 bin 引用 `dist/`
 - **Shell completion 语法检查**: `node bin/Codex-profile.js completion bash | bash -n`(无输出即通过)
 
 ## Command Implementation Patterns
@@ -91,9 +89,9 @@ Source layout: `src/{commands,config,engine,presenters,services,templates,types,
 src/
 ├── commands/     → CLI commands (create, switch, list, edit, delete, export, init)
 ├── config/       → ConfigStore interface + FileSystemConfigStore implementation
-├── engine/       → Core logic (settingsSync, activation)
+├── engine/       → Core logic (activation)
 ├── presenters/   → UI output formatting (ANSI tables, env export)
-├── services/     → Business services (ProfileService, SettingsSyncService)
+├── services/     → Business services (ProfileService)
 ├── templates/    → Provider templates (MiniMax, Kimi, Aliyun, Volcano)
 │                → Also: envTemplate/ (variable interpolation engine)
 │                → Also: providerRegistry.ts (dynamic provider registration)
@@ -109,8 +107,8 @@ src/
 1. `bin/Codex-profile.js` parses CLI args, routes to command
 2. Command calls `ProfileService` to read/write config
 3. `ProfileService` uses `ConfigStore` (`FileSystemConfigStore`) to operate on `~/.config/Codex-profile/`
-4. `SettingsSyncService` syncs env vars to `~/.Codex/settings.json` on switch
-5. `envPresenter` formats output (TTY → table, non-TTY → shell export commands)
+4. `switchCommand` sets the current profile and outputs `export`/`unset` commands (non-TTY); the shell hook's `safe_eval` injects them into the current shell
+5. `envPresenter` formats output (TTY → banner, non-TTY → shell export commands)
 
 ## Code Conventions
 
