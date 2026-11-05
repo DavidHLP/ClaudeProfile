@@ -1,5 +1,7 @@
+import type { Profile, EnvConfig } from '../types/index.js';
 import { ProviderTemplate } from '../types/index.js';
 import { baseEnvTemplate } from './baseEnvTemplate.js';
+import { applyField } from '../domain/profileSchema.js';
 
 export const providerTemplates: ProviderTemplate[] = [
   {
@@ -108,4 +110,46 @@ export const providerTemplates: ProviderTemplate[] = [
 
 export function getProviderById(id: string): ProviderTemplate | undefined {
   return providerTemplates.find((p) => p.id === id);
+}
+
+/**
+ * Materialize a complete `Profile` from a provider template and the
+ * credentials the user supplied. Single source of truth for the
+ * `provider.envTemplate + 5 ANTHROPIC_* keys` merge that every profile
+ * creation goes through.
+ *
+ * Why a function and not a method on `ProviderTemplate`: the literal
+ * template objects in `providerTemplates` are plain data, and adding
+ * a method would require either changing them to classes (large
+ * churn) or attaching the method at module load time (clever, but
+ * harder to test and to read). A free function is the smallest
+ * honest shape.
+ */
+export function materializeProfile(
+  provider: ProviderTemplate,
+  input: {
+    token: string;
+    baseUrl: string;
+    sonnetModel: string;
+    opusModel: string;
+    haikuModel: string;
+  },
+  profileName: string
+): Profile {
+  // Field-by-field application: each `applyField` call writes to every
+  // env key the field owns, so the SONNET slot also updates the legacy
+  // `ANTHROPIC_MODEL` env key in lock-step. The schema is the single
+  // source of truth for which env keys each field controls.
+  let env: EnvConfig = { ...provider.envTemplate };
+  env = applyField(env, 'baseUrl', input.baseUrl);
+  env = applyField(env, 'token', input.token);
+  env = applyField(env, 'sonnetModel', input.sonnetModel);
+  env = applyField(env, 'opusModel', input.opusModel);
+  env = applyField(env, 'haikuModel', input.haikuModel);
+
+  return {
+    name: profileName,
+    description: provider.name,
+    env,
+  };
 }

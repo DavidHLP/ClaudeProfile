@@ -11,20 +11,20 @@ export interface CreateProfileInput extends ProfileCredentialsInput {
   profileName: string;
 }
 
-export type EditableField =
-  | 'token'
-  | 'baseUrl'
-  | 'sonnetModel'
-  | 'opusModel'
-  | 'haikuModel';
+// `EditableField` is a back-compat alias for the schema's
+// `ProfileField` union. The schema (in `domain/profileSchema.ts`) is
+// the single source of truth for which fields are editable and what
+// they're labelled. New code should import `ProfileField` directly
+// from the schema; the alias is preserved so embedders depending on
+// `EditableField` from this module keep working.
+export type { ProfileField, FieldSpec } from '../domain/profileSchema.js';
+export type EditableField = import('../domain/profileSchema.js').ProfileField;
 
-export const EDITABLE_FIELD_LABELS: Record<EditableField, string> = {
-  token: 'API Token',
-  baseUrl: 'API Base URL',
-  sonnetModel: 'SONNET 模型',
-  opusModel: 'OPUS 模型',
-  haikuModel: 'HAIKU 模型',
-};
+import { PROFILE_FIELDS } from '../domain/profileSchema.js';
+
+export const EDITABLE_FIELD_LABELS: Record<EditableField, string> = Object.fromEntries(
+  Object.values(PROFILE_FIELDS).map((spec) => [spec.id, spec.label])
+) as Record<EditableField, string>;
 
 export interface EditProfileInput {
   profileName: string;
