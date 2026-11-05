@@ -23,16 +23,17 @@ const FULL_ENV: EnvConfig = {
   ANTHROPIC_DEFAULT_SONNET_MODEL: 'test-sonnet',
   ANTHROPIC_DEFAULT_OPUS_MODEL: 'test-opus',
   ANTHROPIC_DEFAULT_HAIKU_MODEL: 'test-haiku',
+  CLAUDE_CODE_EFFORT_LEVEL: 'max',
 };
 
 describe('PROFILE_FIELDS', () => {
-  it('has exactly 5 fields', () => {
-    expect(Object.keys(PROFILE_FIELDS)).toHaveLength(5);
+  it('has exactly 6 fields', () => {
+    expect(Object.keys(PROFILE_FIELDS)).toHaveLength(6);
   });
 
   it('contains all expected field ids', () => {
     const ids = Object.keys(PROFILE_FIELDS).sort();
-    expect(ids).toEqual(['baseUrl', 'haikuModel', 'opusModel', 'sonnetModel', 'token']);
+    expect(ids).toEqual(['baseUrl', 'effortLevel', 'haikuModel', 'opusModel', 'sonnetModel', 'token']);
   });
 
   it('PROFILE_FIELDS_ORDER matches the canonical display order', () => {
@@ -42,6 +43,7 @@ describe('PROFILE_FIELDS', () => {
       'sonnetModel',
       'opusModel',
       'haikuModel',
+      'effortLevel',
     ]);
   });
 
@@ -86,7 +88,7 @@ describe('SENSITIVE_ENV_KEYS', () => {
 });
 
 describe('PROFILE_DISPLAY_ROWS', () => {
-  it('has 6 rows: BASE URL, TOKEN, MODEL, SONNET, OPUS, HAIKU', () => {
+  it('has 7 rows: BASE URL, TOKEN, MODEL, SONNET, OPUS, HAIKU, EFFORT', () => {
     expect(PROFILE_DISPLAY_ROWS.map((r) => r.shortLabel)).toEqual([
       'BASE URL',
       'TOKEN',
@@ -94,10 +96,11 @@ describe('PROFILE_DISPLAY_ROWS', () => {
       'SONNET',
       'OPUS',
       'HAIKU',
+      'EFFORT',
     ]);
   });
 
-  it('preserves the original display order', () => {
+  it('preserves the original display order (EFFORT appended)', () => {
     const expectedOrder = [
       'ANTHROPIC_BASE_URL',
       'ANTHROPIC_AUTH_TOKEN',
@@ -105,6 +108,7 @@ describe('PROFILE_DISPLAY_ROWS', () => {
       'ANTHROPIC_DEFAULT_SONNET_MODEL',
       'ANTHROPIC_DEFAULT_OPUS_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+      'CLAUDE_CODE_EFFORT_LEVEL',
     ];
     expect(PROFILE_DISPLAY_ROWS.map((r) => r.envKey)).toEqual(expectedOrder);
   });
@@ -229,7 +233,10 @@ describe('validateProfile', () => {
     };
     const issues = validateProfile(env);
     const warnings = issues.filter((i) => i.severity === 'warning');
-    expect(warnings.length).toBe(4); // ANTHROPIC_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, OPUS, HAIKU
+    // 4 model-slot warnings (ANTHROPIC_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL,
+    // ANTHROPIC_DEFAULT_OPUS_MODEL, ANTHROPIC_DEFAULT_HAIKU_MODEL) plus
+    // 1 EFFORT warning (CLAUDE_CODE_EFFORT_LEVEL is optional with no default).
+    expect(warnings.length).toBe(5);
     expect(warnings.find((i) => i.envKey === 'ANTHROPIC_DEFAULT_OPUS_MODEL')).toBeDefined();
     expect(warnings.find((i) => i.envKey === 'ANTHROPIC_DEFAULT_HAIKU_MODEL')).toBeDefined();
   });
@@ -292,9 +299,9 @@ describe('validateProfile', () => {
 });
 
 describe('profileDetailRows', () => {
-  it('returns 6 rows for a full env', () => {
+  it('returns 7 rows for a full env', () => {
     const rows = profileDetailRows(FULL_ENV, maskProfileValue);
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(7);
     expect(rows.map((r) => r.shortLabel)).toEqual([
       'BASE URL',
       'TOKEN',
@@ -302,6 +309,7 @@ describe('profileDetailRows', () => {
       'SONNET',
       'OPUS',
       'HAIKU',
+      'EFFORT',
     ]);
   });
 
@@ -364,10 +372,10 @@ describe('maskProfileValue', () => {
 });
 
 describe('ProfileField type', () => {
-  it('is a closed union of 5 literal strings', () => {
+  it('is a closed union of 6 literal strings', () => {
     // Compile-time check: this assignment must succeed without error.
-    const fields: ProfileField[] = ['baseUrl', 'token', 'sonnetModel', 'opusModel', 'haikuModel'];
-    expect(fields).toHaveLength(5);
+    const fields: ProfileField[] = ['baseUrl', 'token', 'sonnetModel', 'opusModel', 'haikuModel', 'effortLevel'];
+    expect(fields).toHaveLength(6);
   });
 });
 
