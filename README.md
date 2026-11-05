@@ -8,7 +8,7 @@ Claude Code 配置文件管理器 - 交互式管理多 API 配置
 - 支持多个 Provider: MiniMax、Kimi (Moonshot)、阿里云百炼、火山引擎、讯飞星辰、小米、智谱 GLM 等
 - 密码式 Token 输入，安全可靠
 - 无缝切换环境变量，一条命令完成配置
-- **自动同步到 Claude Code settings.json**（支持 VSCode 和 Zed 扩展）
+- **通过 shell hook 注入环境变量到当前 shell**（不修改 settings.json）
 
 ## 安装
 
@@ -66,7 +66,7 @@ claude-profile switch
 claude-profile switch minimax
 ```
 
-两种方式都会自动应用环境变量并同步到 Claude Code settings！
+两种方式都会通过 shell hook 将环境变量注入当前 shell！
 
 ## 使用方法
 
@@ -172,9 +172,10 @@ claude-profile completion zsh > /usr/local/share/zsh/site-functions/_claude-prof
 claude-profile completion fish > ~/.config/fish/completions/claude-profile.fish
 ```
 
-## Claude Code 集成
+## 环境变量注入
 
-切换配置时会自动同步以下环境变量到 `~/.claude/settings.json`：
+环境变量通过 shell hook 注入当前 shell，**不再写入 `~/.claude/settings.json`**。
+切换配置时，`claude-profile` 输出 `export`/`unset` 命令，由 shell hook 的 `safe_eval` 注入当前 shell：
 
 | 环境变量 | 说明 |
 |---------|------|
@@ -186,9 +187,24 @@ claude-profile completion fish > ~/.config/fish/completions/claude-profile.fish
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | Haiku 模型 |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | 子代理模型 |
 
-这使得 claude-profile 可以同时管理：
-- **Shell 环境变量**：用于 CLI 中的 API 调用
-- **Claude Code 设置**：用于 VSCode/Zed 中的 Claude Code 扩展
+注入范围由 profile.env 决定（可包含任意额外键，如 `API_TIMEOUT_MS`）。
+
+### 默认高性能基线
+
+执行 `eval "$(claude-profile init)"` 时，会自动注入一组通用高性能默认配置（无需 switch 即生效），让未配置 profile 的用户也开箱即用：
+
+| 环境变量 | 默认值 | 说明 |
+|---------|--------|------|
+| `ENABLE_TOOL_SEARCH` | `0` | 规避 Claude Code v2.1.69 BUG |
+| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` | `1` | 关闭实验性 beta |
+| `API_TIMEOUT_MS` | `3000000` | 50 分钟超时窗口 |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 关闭非必要流量上报 |
+| `CLAUDE_CODE_EFFORT_LEVEL` | `max` | 默认最高 effort（env var 优先级最高，可持久） |
+| `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` | `1` | 第三方 provider / 自定义模型 ID 时强制发送 effort 参数（必需，否则 `effort=max` 不生效） |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `75` | 在 autocompact 窗口 75% 时触发压缩（更早压缩；仅主动压缩场景生效，扩展上下文需配合 `CLAUDE_CODE_AUTO_COMPACT_WINDOW`） |
+
+- 不覆盖：已在 shell 中设置的同名变量不会被覆盖（仅未设置时才注入默认值）。
+- 总开关：设 `CLAUDE_PROFILE_DEFAULT_ENV=0` 可完全关闭默认注入。
 
 ## 工作原理
 
@@ -202,7 +218,7 @@ Shell hook 会在你的 shell 中创建一个 `claude-profile` 函数，拦截 `
 ### 存储位置
 
 - **Profiles**: `~/.config/claude-profile/`
-- **Claude Code settings**: `~/.claude/settings.json`
+- **环境变量注入**: 当前 shell（通过 shell hook），不写入 `~/.claude/settings.json`
 
 ### 配置文件格式
 

@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+/**
+ * `claude-profile` CLI entrypoint.
+ *
+ * Constructs a single `CommandContext` (profiles + env presenter + prompts +
+ * TTY flag) and threads it through every command. Tests construct their own
+ * contexts in-process and never reach the bin; production constructs the
+ * default context here exactly once per invocation.
+ */
 import { createCommandInteractive } from '../dist/commands/create.js';
 import { editCommandInteractive } from '../dist/commands/edit.js';
 import { deleteCommand, deleteCommandInteractive } from '../dist/commands/delete.js';
@@ -14,9 +22,13 @@ import { initCommand } from '../dist/commands/init.js';
 import { validateCommand } from '../dist/commands/validate.js';
 import { completionCommand } from '../dist/commands/completion.js';
 import { runProfileCommand, execProfileCommand } from '../dist/commands/run.js';
-import { syncCommand } from '../dist/commands/sync.js';
 import { doctorCommand } from '../dist/commands/doctor.js';
 import { statusCommand } from '../dist/commands/status.js';
+import { createDefaultContext } from '../dist/commands/context.js';
+
+// Build the context once. process.stdout.isTTY drives the TTY-aware
+// branches in switch/export.
+const ctx = createDefaultContext();
 
 let result;
 const args = process.argv.slice(2);
@@ -33,42 +45,40 @@ const globalOptions = {
 async function main() {
   switch (command) {
     case 'create':
-      result = await createCommandInteractive();
+      result = await createCommandInteractive(ctx);
       break;
 
     case 'switch':
       if (args.length === 1) {
-        result = await switchCommandInteractive();
+        result = await switchCommandInteractive(ctx);
       } else {
         const profileName = args[1];
-        const syncToSettings = !args.includes('--no-sync');
-        const scope = getArgValue(args, '--scope');
         const dryRun = args.includes('--dry-run');
-        result = await switchCommand({ profileName, syncToSettings, scope, dryRun });
+        result = await switchCommand(ctx, { profileName, dryRun });
       }
       break;
 
     case 'list':
-      result = await listCommand({ verbose: globalOptions.verbose });
+      result = await listCommand(ctx, { verbose: globalOptions.verbose });
       break;
 
     case 'edit':
-      result = await editCommandInteractive();
+      result = await editCommandInteractive(ctx);
       break;
 
     case 'delete':
       if (args[1] && !args[1].startsWith('-')) {
-        result = await deleteCommand({ profileName: args[1], yes: globalOptions.yes });
+        result = await deleteCommand(ctx, { profileName: args[1], yes: globalOptions.yes });
       } else {
-        result = await deleteCommandInteractive();
+        result = await deleteCommandInteractive(ctx);
       }
       break;
 
     case 'rename':
       if (args.length >= 3) {
-        result = await renameCommand({ oldName: args[1], newName: args[2] });
+        result = await renameCommand(ctx, { oldName: args[1], newName: args[2] });
       } else if (args.length === 2) {
-        result = await renameCommandInteractive();
+        result = await renameCommandInteractive(ctx);
       } else {
         result = { success: false, error: '用法: claude-profile rename <旧名称> <新名称>' };
       }
@@ -76,9 +86,9 @@ async function main() {
 
     case 'duplicate':
       if (args.length >= 3) {
-        result = await duplicateCommand({ sourceName: args[1], newName: args[2] });
+        result = await duplicateCommand(ctx, { sourceName: args[1], newName: args[2] });
       } else if (args.length === 2) {
-        result = await duplicateCommandInteractive();
+        result = await duplicateCommandInteractive(ctx);
       } else {
         result = { success: false, error: '用法: claude-profile duplicate <源名称> <新名称>' };
       }
@@ -88,16 +98,16 @@ async function main() {
       if (args.includes('--current') && args.includes('--file')) {
         const format = args.includes('--yaml') ? 'yaml' : 'json';
         const outputPath = getArgValue(args, '--output');
-        result = await exportCurrentFileCommand({ format, outputPath });
+        result = await exportCurrentFileCommand(ctx, { format, outputPath });
       } else if (args.includes('--file')) {
         const format = args.includes('--yaml') ? 'yaml' : 'json';
         const outputPath = getArgValue(args, '--output');
         const profileName = args[1];
-        result = await exportFileCommand({ profileName, format, outputPath });
+        result = await exportFileCommand(ctx, { profileName, format, outputPath });
       } else if (args.includes('--current')) {
-        result = await exportCurrentCommand({ json: globalOptions.json });
+        result = await exportCurrentCommand(ctx, { json: globalOptions.json });
       } else {
-        result = await exportCommand({ profileName: args[1], json: globalOptions.json });
+        result = await exportCommand(ctx, { profileName: args[1], json: globalOptions.json });
       }
       break;
 
@@ -106,9 +116,9 @@ async function main() {
         const format = args.includes('--yaml') ? 'yaml' : 'json';
         const profileName = getArgValue(args, '--name');
         const force = args.includes('--force');
-        result = await importFileCommand({ inputPath: args[1], format, profileName, force });
+        result = await importFileCommand(ctx, { inputPath: args[1], format, profileName, force });
       } else {
-        result = await importFileCommandInteractive();
+        result = await importFileCommandInteractive(ctx);
       }
       break;
 
@@ -117,21 +127,21 @@ async function main() {
         const restoreIndex = args.indexOf('--restore');
         const backupPath = args[restoreIndex + 1];
         if (backupPath && !backupPath.startsWith('-')) {
-          result = await restoreCommand({ backupPath });
+          result = await restoreCommand(ctx, { backupPath });
         } else {
-          result = await restoreCommandInteractive();
+          result = await restoreCommandInteractive(ctx);
         }
       } else {
         const outputPath = args[1];
-        result = await backupCommand({ outputPath });
+        result = await backupCommand(ctx, { outputPath });
       }
       break;
 
     case 'restore':
       if (args[1]) {
-        result = await restoreCommand({ backupPath: args[1] });
+        result = await restoreCommand(ctx, { backupPath: args[1] });
       } else {
-        result = await restoreCommandInteractive();
+        result = await restoreCommandInteractive(ctx);
       }
       break;
 
@@ -140,7 +150,7 @@ async function main() {
       break;
 
     case 'validate':
-      result = await validateCommand({ verbose: globalOptions.verbose });
+      result = await validateCommand(ctx, { verbose: globalOptions.verbose });
       break;
 
     case 'completion':
@@ -159,29 +169,17 @@ async function main() {
         result = { success: false, error: '用法: claude-profile run <配置名> -- <命令...>' };
       } else {
         const cmd = command === 'run' ? runProfileCommand : execProfileCommand;
-        result = await cmd({ profileName, command: cmdArgs, noInheritEnv, printEnv });
-      }
-      break;
-    }
-
-    case 'sync': {
-      const profileName = args[1];
-      const scope = getArgValue(args, '--scope');
-      const dryRun = args.includes('--dry-run');
-      if (!profileName) {
-        result = { success: false, error: '用法: claude-profile sync <配置名> [--scope user|project|local] [--dry-run]' };
-      } else {
-        result = await syncCommand({ profileName, scope, dryRun });
+        result = await cmd(ctx, { profileName, command: cmdArgs, noInheritEnv, printEnv });
       }
       break;
     }
 
     case 'doctor':
-      result = await doctorCommand();
+      result = await doctorCommand(ctx);
       break;
 
     case 'status':
-      result = await statusCommand();
+      result = await statusCommand(ctx);
       break;
 
     case '--help':
@@ -195,8 +193,8 @@ claude-profile - Claude Code 配置文件管理器
 
 命令:
   create       创建新配置（交互式）
-  switch       切换配置（无参数时进入交互模式）
-               [--no-sync 不同步到 settings.json] [--scope user|project|local] [--dry-run]
+  switch       切换配置（无参数时进入交互模式，通过 shell hook 注入环境变量）
+               [--dry-run]
   list         列出所有配置
   edit         编辑配置
   delete       删除配置
@@ -208,12 +206,18 @@ claude-profile - Claude Code 配置文件管理器
   restore      恢复配置: restore [备份路径]
   run          以指定配置运行命令: run <配置名> -- <命令...> [--no-inherit-env] [--print-env]
   exec         run 的别名
-  sync         同步配置到 settings.json: sync <配置名> [--scope user|project|local] [--dry-run]
   doctor       运行诊断检查
   status       显示当前状态
-  init         输出 shell hook 脚本
+  init         输出 shell hook 脚本（注入环境变量到当前 shell；含通用高性能默认配置）
   validate     验证所有配置完整性
   completion   生成 shell 自动补全脚本 (bash/zsh/fish)
+
+环境变量注入:
+  环境变量通过 shell hook 注入当前 shell，不再写入 ~/.claude/settings.json。
+  在 ~/.bashrc 或 ~/.zshrc 中添加:  eval "$(claude-profile init)"
+  init 时自动注入通用高性能默认配置（BUG 规避/超时/关流量/默认 effort=max/75% 自动压缩），无需 switch 即生效；
+  设 CLAUDE_PROFILE_DEFAULT_ENV=0 可关闭，已设的同名变量不会被覆盖。
+  之后:  claude-profile switch <配置名>   即可将该配置的环境变量注入当前 shell。
 
 全局选项:
   -h, --help         显示帮助信息
@@ -226,8 +230,7 @@ claude-profile - Claude Code 配置文件管理器
   claude-profile list --verbose
   claude-profile delete my-profile --yes
   claude-profile validate -v
-  claude-profile switch minimax --scope project
-  claude-profile sync minimax --dry-run
+  claude-profile switch minimax
   claude-profile doctor
   claude-profile status
   claude-profile completion bash > /etc/bash_completion.d/claude-profile

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { envPresenter, buildExportCommands, buildSwitchCommands } from '../src/presenters/envPresenter.js';
+import { envPresenter } from '../src/presenters/envRenderer.js';
+import { buildExportCommands, buildSwitchCommands } from '../src/engine/envDiff.js';
 import { AppError } from '../src/errors.js';
 import type { EnvConfig, Profile } from '../src/types/index.js';
 
@@ -267,7 +268,7 @@ describe('EnvPresenter', () => {
       expect(result).toContain('❯');
       expect(result).toContain('已切换到');
       expect(result).toContain('test-profile');
-      expect(result).toContain('环境变量已同步');
+      expect(result).toContain('环境变量已注入当前 shell');
     });
   });
 
@@ -310,6 +311,211 @@ describe('EnvPresenter', () => {
 
       expect(result).toContain('test-profile');
       expect(result).toContain('已创建');
+    });
+  });
+
+  // ── formatVerboseHeader (ADR-0005) ────────────────────────────────
+
+  describe('formatVerboseHeader', () => {
+    it('should render all four data fields in order', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: '/home/u/.config/claude-profile',
+        currentProfile: 'minimax',
+        profileCount: 3,
+      });
+
+      const lines = result.split('\n');
+      expect(lines).toEqual([
+        '详细信息:',
+        '  配置目录: /home/u/.config/claude-profile',
+        '  当前配置: minimax',
+        '  配置数量: 3',
+      ]);
+    });
+
+    it('should fall back to 未知 when storeLocation is null', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: null,
+        currentProfile: 'minimax',
+        profileCount: 1,
+      });
+      expect(result).toContain('配置目录: 未知');
+    });
+
+    it('should fall back to 无 when currentProfile is null', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: '/p',
+        currentProfile: null,
+        profileCount: 0,
+      });
+      expect(result).toContain('当前配置: 无');
+    });
+
+    it('should not add leading or trailing newline', () => {
+      const result = envPresenter.formatVerboseHeader({
+        storeLocation: '/p',
+        currentProfile: 'x',
+        profileCount: 1,
+      });
+      expect(result.startsWith('\n')).toBe(false);
+      expect(result.endsWith('\n')).toBe(false);
+    });
+  });
+
+  // ── formatValidationIssues (ADR-0005) ─────────────────────────────
+
+  describe('formatValidationIssues', () => {
+    it('should return empty string for empty issues', () => {
+      expect(envPresenter.formatValidationIssues([])).toBe('');
+    });
+
+    it('should render errors with the ❌ header', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'a', envKey: 'ANTHROPIC_BASE_URL', message: 'URL 不能为空', severity: 'error' },
+      ]);
+      expect(result).toContain('❌ 发现 1 个错误:');
+      expect(result).toContain('  • [a] ANTHROPIC_BASE_URL: URL 不能为空');
+    });
+
+    it('should render warnings with the ⚠️ header', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'b', envKey: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', message: 'ANTHROPIC_DEFAULT_HAIKU_MODEL 未设置', severity: 'warning' },
+      ]);
+      expect(result).toContain('⚠️  发现 1 个警告:');
+      expect(result).toContain('  • [b] ANTHROPIC_DEFAULT_HAIKU_MODEL: ANTHROPIC_DEFAULT_HAIKU_MODEL 未设置');
+    });
+
+    it('should split errors and warnings into two blocks, errors first', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'p1', envKey: 'ANTHROPIC_BASE_URL', message: 'empty', severity: 'error' },
+        { profile: 'p1', envKey: 'ANTHROPIC_AUTH_TOKEN', message: 'empty', severity: 'error' },
+        { profile: 'p2', envKey: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', message: 'unset', severity: 'warning' },
+      ]);
+      const errIdx = result.indexOf('❌');
+      const warnIdx = result.indexOf('⚠️');
+      expect(errIdx).toBeGreaterThanOrEqual(0);
+      expect(warnIdx).toBeGreaterThan(errIdx);
+      expect(result).toContain('❌ 发现 2 个错误:');
+      expect(result).toContain('⚠️  发现 1 个警告:');
+    });
+
+    it('should render only the errors block when no warnings', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'p', envKey: 'K', message: 'm', severity: 'error' },
+      ]);
+      expect(result).toContain('❌');
+      expect(result).not.toContain('⚠️');
+    });
+
+    it('should render only the warnings block when no errors', () => {
+      const result = envPresenter.formatValidationIssues([
+        { profile: 'p', envKey: 'K', message: 'm', severity: 'warning' },
+      ]);
+      expect(result).toContain('⚠️');
+      expect(result).not.toContain('❌');
+    });
+  });
+
+  describe('formatStatus', () => {
+    const noopMask = (_k: string, v: string | undefined) => v ?? '';
+
+    it('renders the 4-section status block with all 3 context lines', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'work',
+        storeLocation: '/home/u/.config/claude-profile',
+        profileCount: 3,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result).toContain('当前状态');
+      expect(result).toContain('当前配置: work');
+      expect(result).toContain('配置目录: /home/u/.config/claude-profile');
+      expect(result).toContain('配置数量: 3');
+    });
+
+    it('renders "无" / "未知" for null currentProfile / storeLocation', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: null,
+        storeLocation: null,
+        profileCount: 0,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result).toContain('当前配置: 无');
+      expect(result).toContain('配置目录: 未知');
+      expect(result).toContain('配置数量: 0');
+    });
+
+    it('renders the empty-state line when shellEnv is empty', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result).toContain('Shell 环境变量 (注入来源):');
+      expect(result).toContain('无 ANTHROPIC_* / CLAUDE_CODE_* 变量');
+    });
+
+    it('renders every shellEnv entry as KEY=value with leading indent', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {
+          ANTHROPIC_BASE_URL: 'https://api.test.com',
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku-1',
+        },
+        maskValue: noopMask,
+      });
+      expect(result).toContain('    ANTHROPIC_BASE_URL=https://api.test.com');
+      expect(result).toContain('    ANTHROPIC_DEFAULT_HAIKU_MODEL=haiku-1');
+      // The header must come before the entries.
+      expect(result.indexOf('Shell 环境变量')).toBeLessThan(
+        result.indexOf('ANTHROPIC_BASE_URL=')
+      );
+    });
+
+    it('applies maskValue to every shellEnv entry — sensitive keys never leak cleartext', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {
+          ANTHROPIC_AUTH_TOKEN: 'sk-supersecret',
+          ANTHROPIC_BASE_URL: 'https://api.test.com',
+        },
+        // Mimic the real `maskValue`: token → '*****', non-sensitive → as-is.
+        maskValue: (k, v) => (k === 'ANTHROPIC_AUTH_TOKEN' ? '*****' : v ?? ''),
+      });
+      expect(result).toContain('    ANTHROPIC_AUTH_TOKEN=*****');
+      expect(result).not.toContain('sk-supersecret');
+      // The non-sensitive key still renders normally.
+      expect(result).toContain('    ANTHROPIC_BASE_URL=https://api.test.com');
+    });
+
+    it('renders "空" when maskValue returns an empty string', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: { ANTHROPIC_BASE_URL: 'something' },
+        maskValue: () => '',
+      });
+      expect(result).toContain('ANTHROPIC_BASE_URL=空');
+    });
+
+    it('preserves the leading and trailing blank lines (drop-in for the command output)', () => {
+      const result = envPresenter.formatStatus({
+        currentProfile: 'p',
+        storeLocation: '/d',
+        profileCount: 1,
+        shellEnv: {},
+        maskValue: noopMask,
+      });
+      expect(result.startsWith('\n')).toBe(true);
+      expect(result.endsWith('\n')).toBe(true);
     });
   });
 });
