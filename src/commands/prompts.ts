@@ -56,6 +56,13 @@ export interface Prompts {
     field: ProfileField,
     options?: { defaultValue?: string }
   ): Promise<string>;
+  /**
+   * Schema-backed effort level selector. Used by both create and edit
+   * flows for the EFFORT field — typed as a free-text path here even
+   * though the underlying UI is a 4-option list, so the Prompts
+   * interface stays homogeneous with the other input methods.
+   */
+  inputProfileEffort(defaultValue?: string): Promise<string>;
   selectEditField(profile: Profile): Promise<EditableField | null>;
   selectBackup(backups: { name: string; path: string; date: Date }[]): Promise<string | null>;
   confirmAction(message: string): Promise<boolean>;
@@ -83,6 +90,7 @@ export const realPrompts: Prompts = {
       validate: spec.validateInput,
     });
   },
+  inputProfileEffort: (defaultValue) => prompt.selectEffortLevel(defaultValue),
   selectEditField: (profile) => prompt.selectEditField(profile),
   selectBackup: (backups) => prompt.selectBackup(backups),
   confirmAction: (message) => prompt.confirmAction(message),

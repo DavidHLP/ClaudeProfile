@@ -63,7 +63,7 @@ Source layout: `src/{commands,config,engine,presenters,services,templates,types,
 - `eval "$(claude-profile init)"` 注册 `claude-profile` shell function，拦截 `switch` 命令并 `eval` 其输出的 `export`/`unset` 命令
 - 注入的 key 来自 profile.env（任意键，如 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL` 等）
 - 安全：`_claude_profile_safe_eval` 只 eval 匹配 `export KEY='val'` / `unset KEY` 的行，其余跳过
-- 默认基线：`init` 时还会注入 `baseEnvTemplate` 的通用键（`ENABLE_TOOL_SEARCH` / `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` / `API_TIMEOUT_MS` / `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` / `CLAUDE_CODE_EFFORT_LEVEL=max` / `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1` / `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=75`），让未配置 profile 的用户开箱即用（含默认最高 effort 与 75% 自动压缩）；`[ -z "${VAR+set}" ]` 守卫不覆盖用户已设值，`CLAUDE_PROFILE_DEFAULT_ENV=0` 可关闭
+- 默认基线：`init` 时还会注入 `baseEnvTemplate` 的通用键（`ENABLE_TOOL_SEARCH` / `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` / `API_TIMEOUT_MS` / `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` / `CLAUDE_CODE_EFFORT_LEVEL=ultracode` / `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1` / `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=75`），让未配置 profile 的用户开箱即用（含默认最高 effort 与 75% 自动压缩）；`[ -z "${VAR+set}" ]` 守卫不覆盖用户已设值，`CLAUDE_PROFILE_DEFAULT_ENV=0` 可关闭
 
 ## Config Locations
 
