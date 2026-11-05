@@ -1,9 +1,9 @@
 import { spawn } from 'child_process';
-import { profileService } from '../services/profileService.js';
 import { CommandResult } from '../types/command.js';
 import { runCommand } from './runner.js';
 import { AppError } from '../errors.js';
 import { maskValue } from '../utils/sensitiveKeys.js';
+import type { CommandContext } from './context.js';
 
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
 const GRACE_PERIOD_MS = 5000;
@@ -15,10 +15,12 @@ export interface RunProfileInput {
   printEnv?: boolean;
 }
 
-export async function runProfileCommand(input: RunProfileInput): Promise<CommandResult> {
+export async function runProfileCommand(ctx: CommandContext, input: RunProfileInput): Promise<CommandResult> {
   return runCommand('运行配置', async () => {
-    const profile = profileService.getProfile(input.profileName);
-    if (!profile) {
+    let profile;
+    try {
+      profile = ctx.profiles.getProfile(input.profileName);
+    } catch {
       throw new AppError(`配置 '${input.profileName}' 不存在`, 'PROFILE_NOT_FOUND');
     }
 
@@ -83,6 +85,6 @@ export async function runProfileCommand(input: RunProfileInput): Promise<Command
   });
 }
 
-export async function execProfileCommand(input: RunProfileInput): Promise<CommandResult> {
-  return runProfileCommand(input);
+export async function execProfileCommand(ctx: CommandContext, input: RunProfileInput): Promise<CommandResult> {
+  return runProfileCommand(ctx, input);
 }
