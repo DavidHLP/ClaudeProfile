@@ -104,7 +104,12 @@ export const providerTemplates: ProviderTemplate[] = [
     description: '手动配置所有参数',
     defaultBaseUrl: '',
     defaultModel: '',
-    envTemplate: {},
+    // 自定义模式同样继承 baseEnvTemplate：
+    // 1) 与其他 provider 行为一致（CLAUDE_CODE_EFFORT_LEVEL=max 等基线键进 profile.env）
+    // 2) profile 可移植：拷贝到别处仍带 max effort 默认
+    // 3) 避免未来 envDiff 清理"多余" CLAUDE_CODE_* 键时静默丢失 max
+    // 模型槽位由用户在 create 时手填，这里不预设 ANTHROPIC_DEFAULT_*_MODEL。
+    envTemplate: { ...baseEnvTemplate },
   },
 ];
 
@@ -133,6 +138,12 @@ export function materializeProfile(
     sonnetModel: string;
     opusModel: string;
     haikuModel: string;
+    /**
+     * Optional. Defaults to the provider's `envTemplate.CLAUDE_CODE_EFFORT_LEVEL`
+     * (or `'max'` if absent) so older callers that pass only the 5
+     * first-class fields keep working unchanged.
+     */
+    effortLevel?: string;
   },
   profileName: string
 ): Profile {
@@ -146,6 +157,12 @@ export function materializeProfile(
   env = applyField(env, 'sonnetModel', input.sonnetModel);
   env = applyField(env, 'opusModel', input.opusModel);
   env = applyField(env, 'haikuModel', input.haikuModel);
+  // Resolve the EFFORT default from the provider template (which already
+  // carries baseEnvTemplate.CLAUDE_CODE_EFFORT_LEVEL for every built-in
+  // provider including 'custom'); fall back to 'max' for synthetic test
+  // providers that omit it.
+  const effort = input.effortLevel ?? provider.envTemplate.CLAUDE_CODE_EFFORT_LEVEL ?? 'max';
+  env = applyField(env, 'effortLevel', effort);
 
   return {
     name: profileName,
