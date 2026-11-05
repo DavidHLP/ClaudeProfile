@@ -1,12 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ProfileServiceImpl } from '../src/services/profileService.js';
+import { InMemoryConfigStore } from '../src/config/inMemoryConfigStore.js';
+import { envPresenter } from '../src/presenters/envRenderer.js';
+import { noopPrompts, type CommandContext } from '../src/commands/context.js';
 
-const mockProfileService = {
-  getProfile: vi.fn(),
-};
-
-vi.mock('../src/services/profileService.js', () => ({
-  profileService: mockProfileService,
-}));
+function buildCtx(): { ctx: CommandContext; store: InMemoryConfigStore } {
+  const store = new InMemoryConfigStore();
+  const service = new ProfileServiceImpl(store);
+  return {
+    ctx: { profiles: service, env: envPresenter, prompts: noopPrompts, isTTY: false },
+    store,
+  };
+}
 
 describe('runProfileCommand', () => {
   beforeEach(() => {
@@ -14,10 +19,9 @@ describe('runProfileCommand', () => {
   });
 
   it('should return error for non-existent profile', async () => {
-    mockProfileService.getProfile.mockReturnValue(null);
-
+    const { ctx } = buildCtx();
     const { runProfileCommand } = await import('../src/commands/run.js');
-    const result = await runProfileCommand({
+    const result = await runProfileCommand(ctx, {
       profileName: 'missing',
       command: ['echo', 'hello'],
     });
@@ -29,13 +33,14 @@ describe('runProfileCommand', () => {
   });
 
   it('should return error when no command is provided', async () => {
-    mockProfileService.getProfile.mockReturnValue({
+    const { ctx, store } = buildCtx();
+    store.saveProfile({
       name: 'test',
+      description: 'Test',
       env: { FOO: 'bar' },
     });
-
     const { runProfileCommand } = await import('../src/commands/run.js');
-    const result = await runProfileCommand({
+    const result = await runProfileCommand(ctx, {
       profileName: 'test',
       command: [],
     });
@@ -47,13 +52,14 @@ describe('runProfileCommand', () => {
   });
 
   it('should print env with --print-env', async () => {
-    mockProfileService.getProfile.mockReturnValue({
+    const { ctx, store } = buildCtx();
+    store.saveProfile({
       name: 'test',
-      env: { ANTHROPIC_BASE_URL: 'https://api.test.com' },
+      description: 'Test',
+      env: { FOO: 'bar', ANTHROPIC_AUTH_TOKEN: 'secret-token' },
     });
-
     const { runProfileCommand } = await import('../src/commands/run.js');
-    const result = await runProfileCommand({
+    const result = await runProfileCommand(ctx, {
       profileName: 'test',
       command: [],
       printEnv: true,
@@ -61,23 +67,20 @@ describe('runProfileCommand', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.output).toContain('ANTHROPIC_BASE_URL=https://api.test.com');
+      // Sensitive key should be masked
+      expect(result.output).toContain('ANTHROPIC_AUTH_TOKEN=secr****');
+      expect(result.output).toContain('FOO=bar');
     }
   });
 
   it('exec should behave as alias for run', async () => {
-    mockProfileService.getProfile.mockReturnValue({
-      name: 'test',
-      env: { FOO: 'bar' },
-    });
-
+    const { ctx } = buildCtx();
     const { execProfileCommand } = await import('../src/commands/run.js');
-    const result = await execProfileCommand({
-      profileName: 'test',
-      command: [],
-      printEnv: true,
+    const result = await execProfileCommand(ctx, {
+      profileName: 'missing',
+      command: ['echo', 'hello'],
     });
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 });

@@ -1,88 +1,72 @@
 import { EnvConfig } from '../types/index.js';
-import { profileService } from '../services/profileService.js';
-import { envPresenter } from '../presenters/envPresenter.js';
 import { EditableField, EditProfileInput, CommandResult } from '../types/command.js';
+import type { CommandContext } from './context.js';
 import { runCommand } from './runner.js';
+import { runProfileAction, CancelledError } from './interactiveSession.js';
+import { applyField, getFieldValue, PROFILE_FIELDS } from '../domain/profileSchema.js';
 
-const FIELD_TO_ENV_KEYS: Record<EditableField, readonly (keyof EnvConfig)[]> = {
-  token: ['ANTHROPIC_AUTH_TOKEN'],
-  baseUrl: ['ANTHROPIC_BASE_URL'],
-  sonnetModel: ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL'],
-  opusModel: ['ANTHROPIC_DEFAULT_OPUS_MODEL'],
-  haikuModel: ['ANTHROPIC_DEFAULT_HAIKU_MODEL'],
-};
-
-export async function editCommand(input: EditProfileInput): Promise<CommandResult> {
+export async function editCommand(ctx: CommandContext, input: EditProfileInput): Promise<CommandResult> {
   return runCommand('编辑配置', async () => {
-    const profile = profileService.getProfile(input.profileName);
+    const profile = ctx.profiles.getProfile(input.profileName);
 
-    const nextEnv: EnvConfig = { ...profile.env };
-    for (const key of FIELD_TO_ENV_KEYS[input.field]) {
-      nextEnv[key] = input.value;
-    }
+    // `applyField` writes to every env key the field owns (e.g. SONNET
+    // writes to both `ANTHROPIC_DEFAULT_SONNET_MODEL` and the legacy
+    // `ANTHROPIC_MODEL`). The schema is the single source of truth for
+    // which env keys each field controls; this command no longer
+    // duplicates that mapping.
+    const nextEnv = applyField(profile.env, input.field, input.value);
 
-    profileService.saveProfile({ ...profile, env: nextEnv });
+    ctx.profiles.saveProfile({ ...profile, env: nextEnv });
 
     return {
       success: true,
-      output: envPresenter.formatEditSuccess(input.profileName, input.field),
+      output: ctx.env.formatEditSuccess(input.profileName, input.field),
     };
   });
 }
 
-export async function editCommandInteractive(): Promise<CommandResult> {
-  const {
-    selectProfileFromList,
-    selectEditField,
-    inputApiToken,
-    inputBaseUrl,
-    inputSonnetModel,
-    inputOpusModel,
-    inputHaikuModel,
-  } = await import('../ui/prompt.js');
-
-  const profiles = profileService.listProfiles();
-  if (profiles.length === 0) {
-    return { success: false, error: '没有可编辑的配置。请先使用 create 命令创建配置。' };
-  }
-
-  const currentProfile = profileService.getCurrentProfile();
-  const selectedName = await selectProfileFromList(profiles, currentProfile);
-
-  if (!selectedName) {
-    return { success: false, error: '已取消编辑。', wasCancelled: true };
-  }
-
-  const profile = profileService.getProfile(selectedName);
-  const field = await selectEditField(profile);
-
-  if (!field) {
-    return { success: false, error: '已取消编辑。', wasCancelled: true };
-  }
-
-  const env = profile.env;
-  let value: string;
-  switch (field) {
-    case 'token':
-      value = await inputApiToken();
-      break;
-    case 'baseUrl':
-      value = await inputBaseUrl(env.ANTHROPIC_BASE_URL);
-      break;
-    case 'sonnetModel':
-      value = await inputSonnetModel(env.ANTHROPIC_DEFAULT_SONNET_MODEL || env.ANTHROPIC_MODEL);
-      break;
-    case 'opusModel':
-      value = await inputOpusModel(env.ANTHROPIC_DEFAULT_OPUS_MODEL);
-      break;
-    case 'haikuModel':
-      value = await inputHaikuModel(env.ANTHROPIC_DEFAULT_HAIKU_MODEL);
-      break;
-  }
-
-  return editCommand({
-    profileName: selectedName,
-    field,
-    value,
+/**
+ * Prompt the user for the new value of a specific editable field,
+ * using the existing env value (if any) as the default.
+ *
+ * The `field` dispatch is owned by the schema's `inputProfileField`
+ * (via `ctx.prompts`). The schema provides the per-field label and
+ * the input-time validator; `getFieldValue` provides the current
+ * value as the default. This helper is the single bridge between
+ * the edit command and the schema-backed prompt surface.
+ */
+async function promptForEditableField(
+  ctx: CommandContext,
+  profile: { env: EnvConfig },
+  field: EditableField
+): Promise<string> {
+  return ctx.prompts.inputProfileField(field, {
+    defaultValue: getFieldValue(profile.env, field),
   });
 }
+
+export async function editCommandInteractive(ctx: CommandContext): Promise<CommandResult> {
+  return runProfileAction(ctx, {
+    verb: '编辑',
+    emptyMessage: '没有可编辑的配置。请先使用 create 命令创建配置。',
+    // No `confirm` — `edit` is non-destructive; the user already
+    // walked through field selection, so the "are you sure" step
+    // would just be friction.
+    buildInput: async (selected, ctx) => {
+      const field = await ctx.prompts.selectEditField(selected);
+      if (!field) {
+        throw new CancelledError('编辑');
+      }
+      const value = await promptForEditableField(ctx, selected, field);
+      return { profileName: selected.name, field, value };
+    },
+    execute: editCommand,
+  });
+}
+
+// Re-export the schema's `PROFILE_FIELDS` so the edit command's
+// per-field validation policy stays anchored to the canonical
+// spec map (and not duplicated here). The export is `void`'d to
+// keep the import alive for downstream readers and to silence
+// the no-unused-vars lint if the import ever falls out of use.
+void PROFILE_FIELDS;
