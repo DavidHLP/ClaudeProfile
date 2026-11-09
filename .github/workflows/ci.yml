@@ -35,6 +35,27 @@ jobs:
         run: npm run test
 
       - name: Verify CLI binary
+        shell: bash
+        timeout-minutes: 1
         run: |
-          chmod +x ./bin/claude-profile.js
-          node ./bin/claude-profile.js --version || true
+          set -euo pipefail
+          cli_home="$(mktemp -d)"
+          trap 'rm -rf "$cli_home"' EXIT
+          export HOME="$cli_home"
+          export XDG_CONFIG_HOME="$HOME/.config"
+
+          node ./bin/claude-profile.js --help > "$cli_home/help.txt"
+          cat "$cli_home/help.txt"
+          grep -Fq 'claude-profile <命令> [选项] [配置名]' "$cli_home/help.txt"
+          grep -Fq -- '-h, --help' "$cli_home/help.txt"
+
+          if node ./bin/claude-profile.js __ci_unknown_command__ > "$cli_home/unknown.stdout" 2> "$cli_home/unknown.stderr"; then
+            echo '::error::Unknown CLI command unexpectedly succeeded' >&2
+            exit 1
+          else
+            status=$?
+          fi
+          cat "$cli_home/unknown.stderr" >&2
+          test "$status" -eq 1
+          grep -Fxq '未知命令: __ci_unknown_command__' "$cli_home/unknown.stderr"
+          grep -Fxq '使用 claude-profile --help 查看帮助' "$cli_home/unknown.stderr"
