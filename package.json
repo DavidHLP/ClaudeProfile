@@ -14,10 +14,12 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "node scripts/test.mjs",
+    "test:watch": "node scripts/test.mjs --watch",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:coverage": "node scripts/test.mjs --coverage",
+    "test:runner": "node scripts/test-runner-contract.mjs"
   },
   "keywords": [
     "claude",
@@ -36,19 +38,19 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@bcoe/v8-coverage": "^1.0.2",
     "@types/inquirer": "^9.0.0",
     "@types/node": "^26.6.6",
     "@types/tar-fs": "^2.0.4",
-    "@vitest/coverage-v8": "^3.2.7",
+    "expect": "29.7.0",
+    "istanbul-lib-coverage": "^3.2.2",
+    "istanbul-lib-report": "^3.0.1",
+    "istanbul-reports": "^3.2.0",
+    "jest-mock": "29.7.0",
     "typescript": "^7.0.2",
-    "vite": "^6.4.5",
-    "vitest": "^3.2.7"
+    "v8-to-istanbul": "^9.3.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "overrides": {
-    "brace-expansion@^2.0.0": "2.1.7",
-    "brace-expansion@^5.0.0": "5.0.7"
   }
 }

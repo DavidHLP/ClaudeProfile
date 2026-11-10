@@ -16,7 +16,7 @@
  * We mock the `inquirer` module to return a controlled `selected`
  * key per test.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mocks } from './support/test.js';
 import type { Profile } from '../src/types/index.js';
 import { InMemoryConfigStore } from '../src/config/inMemoryConfigStore.js';
 import { ProfileServiceImpl } from '../src/services/profileService.js';
@@ -41,15 +41,12 @@ import { CommandResult } from '../src/types/command.js';
 
 let mockInquirerSelected: string | null = 'alpha';
 
-vi.mock('inquirer', () => ({
-  default: {
-    prompt: vi.fn(async () => ({ selected: mockInquirerSelected })),
-    Separator: class Separator {},
-  },
-}));
+
 
 import inquirer from 'inquirer';
-const promptMock = inquirer.prompt as unknown as ReturnType<typeof vi.fn>;
+const originalPrompt = inquirer.prompt;
+const promptMock = mocks.fn(async () => ({ selected: mockInquirerSelected }));
+
 
 // ── Fixtures ───────────────────────────────────────────────────────────
 
@@ -82,11 +79,13 @@ function buildCtx(store: InMemoryConfigStore = new InMemoryConfigStore()): {
 }
 
 beforeEach(() => {
+  inquirer.prompt = promptMock as typeof inquirer.prompt;
   mockInquirerSelected = 'alpha';
   promptMock.mockClear();
 });
 
 afterEach(() => {
+  inquirer.prompt = originalPrompt;
   mockInquirerSelected = 'alpha';
 });
 
@@ -130,7 +129,7 @@ describe('CancelledError', () => {
 describe('runSelectableAction — empty list', () => {
   it('returns the empty message when the list is empty', async () => {
     const { ctx } = buildCtx();
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     const result = await runSelectableAction(ctx, {
       verb: '删除',
@@ -151,7 +150,7 @@ describe('runSelectableAction — single-item shortcut', () => {
     const { ctx, store } = buildCtx();
     store.saveProfile(makeProfile('only'));
     store.setCurrentProfile('only');
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     const result = await runSelectableAction(ctx, {
       verb: '切换',
@@ -172,7 +171,7 @@ describe('runSelectableAction — single-item shortcut', () => {
   it('skips the prompt when skipSelectionWhenSingleMatch is true and currentKey is null (no active concept)', async () => {
     const { ctx, store } = buildCtx();
     store.saveProfile(makeProfile('only'));
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     const result = await runSelectableAction(ctx, {
       verb: '恢复',
@@ -194,7 +193,7 @@ describe('runSelectableAction — single-item shortcut', () => {
     const { ctx, store } = buildCtx();
     store.saveProfile(makeProfile('only'));
     store.setCurrentProfile('other');
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
     mockInquirerSelected = 'only';
 
     const result = await runSelectableAction(ctx, {
@@ -218,7 +217,7 @@ describe('runSelectableAction — single-item shortcut', () => {
     store.saveProfile(makeProfile('b'));
     mockInquirerSelected = 'b';
 
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     await runSelectableAction(ctx, {
       verb: '删除',
@@ -243,7 +242,7 @@ describe('runSelectableAction — selection & execution', () => {
     store.saveProfile(makeProfile('a'));
     store.saveProfile(makeProfile('b'));
     mockInquirerSelected = 'b';
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'b' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'b' }));
 
     const result = await runSelectableAction(ctx, {
       verb: '删除',
@@ -264,7 +263,7 @@ describe('runSelectableAction — selection & execution', () => {
     store.saveProfile(makeProfile('a'));
     mockInquirerSelected = 'a';
 
-    const format = vi.fn((p: Profile) => `MY-FORMAT[${p.name}]`);
+    const format = mocks.fn((p: Profile) => `MY-FORMAT[${p.name}]`);
 
     await runSelectableAction(ctx, {
       verb: 'view',
@@ -286,7 +285,7 @@ describe('runSelectableAction — selection & execution', () => {
     const { ctx, store } = buildCtx();
     store.saveProfile(makeProfile('a'));
     mockInquirerSelected = null;
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     const result = await runSelectableAction(ctx, {
       verb: '删除',
@@ -306,7 +305,7 @@ describe('runSelectableAction — selection & execution', () => {
     const { ctx, store, prompts } = buildCtx();
     store.saveProfile(makeProfile('a'));
     mockInquirerSelected = 'a';
-    prompts.confirmAction = vi.fn(async () => false);
+    prompts.confirmAction = mocks.fn(async () => false);
 
     const result = await runSelectableAction(ctx, {
       verb: '删除',
@@ -411,7 +410,7 @@ describe('runProfileAction — convenience alias', () => {
     const { ctx, store } = buildCtx();
     store.saveProfile(makeProfile('a'));
     mockInquirerSelected = 'a';
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     await runProfileAction(ctx, {
       verb: '查看',
@@ -447,7 +446,7 @@ describe('runProfileAction — convenience alias', () => {
     const { ctx, store } = buildCtx();
     store.saveProfile(makeProfile('only'));
     store.setCurrentProfile('only');
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     const result = await runProfileAction(ctx, {
       verb: '切换',

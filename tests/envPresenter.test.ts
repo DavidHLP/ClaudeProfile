@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from './support/test.js';
 import { envPresenter } from '../src/presenters/envRenderer.js';
 import { buildExportCommands, buildSwitchCommands } from '../src/engine/envDiff.js';
 import { AppError } from '../src/errors.js';

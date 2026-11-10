@@ -43,3 +43,5 @@ mempalace.yaml
 entities.json
 .work/
 .serena/
+
+.test-build/

@@ -23,8 +23,8 @@
 | Package | Purpose |
 |---------|---------|
 | `typescript` | Type checking and compilation |
-| `vitest` | Unit testing framework |
-| `@vitest/coverage-v8` | Test coverage reporting |
+| Node.js `node:test` + `expect` / `jest-mock` | Isolated tests, assertions and function mocks |
+| `v8-to-istanbul` + Istanbul reports | Native V8 coverage remapped to TypeScript |
 | `@types/inquirer` | TypeScript types for inquirer |
 | `@types/node` | Node.js type definitions |
 | `@types/tar-fs` | TypeScript types for tar-fs |

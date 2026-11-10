@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, mocks, beforeEach, afterEach } from './support/test.js';
 import { ApiConnectivityError } from '../src/utils/connectivity.js';
 
 describe('API Connectivity Detection', () => {
@@ -13,7 +13,7 @@ describe('API Connectivity Detection', () => {
   });
 
   it('returns true for reachable API endpoint', async () => {
-    global.fetch = vi.fn().mockResolvedValue(
+    global.fetch = mocks.fn().mockResolvedValue(
       new Response('{"object":"model_list"}', {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -27,7 +27,7 @@ describe('API Connectivity Detection', () => {
   });
 
   it('returns false for unreachable API endpoint', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    global.fetch = mocks.fn().mockRejectedValue(new Error('Network error'));
 
     const { checkApiConnectivity } = await import('../src/utils/connectivity.js');
 
@@ -36,7 +36,7 @@ describe('API Connectivity Detection', () => {
   });
 
   it('returns false for 401 Unauthorized', async () => {
-    global.fetch = vi.fn().mockResolvedValue(
+    global.fetch = mocks.fn().mockResolvedValue(
       new Response('Unauthorized', { status: 401 })
     );
 
@@ -47,7 +47,7 @@ describe('API Connectivity Detection', () => {
   });
 
   it('returns false for 403 Forbidden', async () => {
-    global.fetch = vi.fn().mockResolvedValue(
+    global.fetch = mocks.fn().mockResolvedValue(
       new Response('Forbidden', { status: 403 })
     );
 
@@ -58,7 +58,7 @@ describe('API Connectivity Detection', () => {
   });
 
   it('throws ApiConnectivityError with correct context', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'));
+    global.fetch = mocks.fn().mockRejectedValue(new Error('Connection refused'));
 
     const { checkApiConnectivity, ApiConnectivityError } = await import('../src/utils/connectivity.js');
 
@@ -67,7 +67,7 @@ describe('API Connectivity Detection', () => {
   });
 
   it('uses correct timeout', async () => {
-    const mockFetch = vi.fn().mockImplementation(
+    const mockFetch = mocks.fn().mockImplementation(
       (url: string, options?: { signal?: AbortSignal }) => {
         return new Promise((_, reject) => {
           const timeoutId = setTimeout(() => {

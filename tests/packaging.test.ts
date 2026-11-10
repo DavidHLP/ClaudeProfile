@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from './support/test.js';
 
 interface PackageJson {
   files?: string[];

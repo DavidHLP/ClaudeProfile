@@ -15,7 +15,7 @@
  * (c) get `c.profiles.getCurrentProfile()` as the default selection
  * cursor, and (d) read the profile list from the service.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mocks } from './support/test.js';
 import type { Profile } from '../src/types/index.js';
 import { InMemoryConfigStore } from '../src/config/inMemoryConfigStore.js';
 import { ProfileServiceImpl } from '../src/services/profileService.js';
@@ -29,15 +29,12 @@ import { CommandResult } from '../src/types/command.js';
 
 let mockInquirerSelected: string | null = 'alpha';
 
-vi.mock('inquirer', () => ({
-  default: {
-    prompt: vi.fn(async () => ({ selected: mockInquirerSelected })),
-    Separator: class Separator {},
-  },
-}));
+
 
 import inquirer from 'inquirer';
-const promptMock = inquirer.prompt as unknown as ReturnType<typeof vi.fn>;
+const originalPrompt = inquirer.prompt;
+const promptMock = mocks.fn(async () => ({ selected: mockInquirerSelected }));
+
 
 function makeProfile(name: string, opts: { active?: boolean; description?: string } = {}): Profile {
   return {
@@ -64,11 +61,13 @@ function buildCtx(store: InMemoryConfigStore = new InMemoryConfigStore()): {
 }
 
 beforeEach(() => {
+  inquirer.prompt = promptMock as typeof inquirer.prompt;
   mockInquirerSelected = 'alpha';
   promptMock.mockClear();
 });
 
 afterEach(() => {
+  inquirer.prompt = originalPrompt;
   mockInquirerSelected = 'alpha';
 });
 
@@ -79,7 +78,7 @@ describe('runProfileAction — defaults (ADR-0014)', () => {
     store.saveProfile(makeProfile('b'));
     mockInquirerSelected = 'b';
 
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     await runProfileAction(ctx, {
       verb: 'X',
@@ -132,7 +131,7 @@ describe('runProfileAction — defaults (ADR-0014)', () => {
     // cursor lands on 'b' (index 1).
     mockInquirerSelected = 'b';
 
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     await runProfileAction(ctx, {
       verb: 'X',
@@ -150,7 +149,7 @@ describe('runProfileAction — defaults (ADR-0014)', () => {
     store.saveProfile(makeProfile('only'));
     store.setCurrentProfile('only');
 
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     const result = await runProfileAction(ctx, {
       verb: 'X',
@@ -191,7 +190,7 @@ describe('runProfileAction — defaults (ADR-0014)', () => {
     store.saveProfile(makeProfile('b'));
     mockInquirerSelected = 'a';
 
-    const execute = vi.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
+    const execute = mocks.fn(async (): Promise<CommandResult> => ({ success: true, output: 'ok' }));
 
     await runProfileAction(ctx, {
       verb: 'X',
@@ -232,8 +231,8 @@ describe('migrated profile-flow commands (ADR-0014 regression)', () => {
     mockInquirerSelected = 'alpha';
     // editCommandInteractive does a follow-up selectEditField; mock it
     // to return 'token' so the test reaches the inquirer call.
-    ctx.prompts.selectEditField = vi.fn(async () => 'token' as const);
-    ctx.prompts.inputProfileField = vi.fn(async () => 'tok-value');
+    ctx.prompts.selectEditField = mocks.fn(async () => 'token' as const);
+    ctx.prompts.inputProfileField = mocks.fn(async () => 'tok-value');
 
     const { editCommandInteractive } = await import('../src/commands/edit.js');
     await editCommandInteractive(ctx);

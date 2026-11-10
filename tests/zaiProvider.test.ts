@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from './support/test.js';
 import { providerTemplates, getProviderById } from '../src/templates/providers.js';
 import type { ProviderTemplate } from '../src/types/index.js';
 import { baseEnvTemplate } from '../src/templates/baseEnvTemplate.js';

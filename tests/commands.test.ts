@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from './support/test.js';
 import type { Profile } from '../src/types/index.js';
 import { ProfileNotFoundError } from '../src/errors.js';
 import { ProfileServiceImpl } from '../src/services/profileService.js';

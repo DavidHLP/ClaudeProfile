@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
 /**
  * Tests for the Diagnostic module and its presenter.
  *
@@ -6,31 +9,36 @@
  * `CommandContext` and a mocked `fs` / `os` so the tests are
  * deterministic and don't touch the host.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, mocks, beforeEach, afterEach } from './support/test.js';
 import { runDiagnostics, type CheckResult } from '../src/domain/diagnostic.js';
 import { envPresenter } from '../src/presenters/envRenderer.js';
 import { noopPrompts, type CommandContext } from '../src/commands/context.js';
 import type { ProfileService } from '../src/services/profileService.js';
 import type { Profile } from '../src/types/index.js';
 
-vi.mock('fs', () => ({
-  existsSync: vi.fn((p: unknown) => typeof p === 'string' && p.includes('claude-profile')),
-  statSync: vi.fn(() => ({ mode: 0o40700 })),
-  readdirSync: vi.fn(() => []),
-  readFileSync: vi.fn(() => '# claude-profile hook loaded'),
-}));
-
-vi.mock('os', () => ({
-  homedir: () => '/tmp',
-}));
-
-vi.mock('path', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('path')>();
-  return {
-    ...mod,
-    join: (...parts: string[]) => parts.join('/'),
-  };
+const originalFs = { existsSync: fs.existsSync, statSync: fs.statSync, readdirSync: fs.readdirSync, readFileSync: fs.readFileSync };
+const originalHomedir = os.homedir;
+beforeEach(() => {
+Object.assign(fs, {
+  existsSync: mocks.fn((p: unknown) => typeof p === 'string' && p.includes('claude-profile')),
+  statSync: mocks.fn(() => ({ mode: 0o40700 })),
+  readdirSync: mocks.fn(() => []),
+  readFileSync: mocks.fn(() => '# claude-profile hook loaded'),
 });
+
+Object.assign(os, {
+  homedir: () => '/tmp',
+});
+
+// Native path functions are retained; fixtures use platform-correct paths.
+syncBuiltinESMExports();
+});
+afterEach(() => {
+  Object.assign(fs, originalFs);
+  os.homedir = originalHomedir;
+  syncBuiltinESMExports();
+});
+
 
 function buildService(profiles: Profile[], current: string | null, storeLocation: string | null = '/tmp/.config/claude-profile'): ProfileService {
   return {
@@ -58,7 +66,7 @@ function buildCtx(service: ProfileService): CommandContext {
 
 describe('runDiagnostics', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    mocks.clearAllMocks();
   });
 
   it('returns 7 checks in canonical order', () => {

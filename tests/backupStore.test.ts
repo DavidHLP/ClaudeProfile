@@ -10,7 +10,7 @@
  * entries; the filesystem adapter's identical validator is the
  * same code path.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from './support/test.js';
 import { InMemoryBackupStore } from '../src/services/inMemoryBackupStore.js';
 import { backupStore } from '../src/services/backupStore.js';
 import { AppError, FileOperationError } from '../src/errors.js';

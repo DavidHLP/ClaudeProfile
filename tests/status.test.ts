@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from './support/test.js';
 import type { Profile } from '../src/types/index.js';
 import { envPresenter } from '../src/presenters/envRenderer.js';
 import { noopPrompts, type CommandContext } from '../src/commands/context.js';

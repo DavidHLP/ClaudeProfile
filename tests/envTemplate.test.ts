@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from './support/test.js';
 import type { EnvTemplateConfig } from '../src/templates/envTemplate/types.js';
 import {
   EnvTemplateEngine,
@@ -383,7 +383,7 @@ describe('Variable Reference Extraction', () => {
 
     expect(refs).toContain('A');
     expect(refs).toContain('B');
-    expect(refs).toHaveLength(2);  // A and B, not duplicated
+    expect(refs.size).toBe(2);  // A and B, not duplicated
   });
 
   it('handles nested references', async () => {

@@ -1,4 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { doctorCommand } from '../src/commands/doctor.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+import { describe, it, expect, mocks, beforeEach, afterEach } from './support/test.js';
 import type { Profile } from '../src/types/index.js';
 import { envPresenter } from '../src/presenters/envRenderer.js';
 import { noopPrompts, type CommandContext } from '../src/commands/context.js';
@@ -7,28 +11,33 @@ import type { ProfileService } from '../src/services/profileService.js';
 // Doctor reaches into `fs` for permissions, `.bashrc`/`.zshrc` for shell-hook
 // detection, and `process.cwd()` for git. We stub them all so the test is
 // deterministic and doesn't touch the host.
-vi.mock('fs', () => ({
-  existsSync: vi.fn((p: unknown) => typeof p === 'string' && p.includes('claude-profile')),
-  statSync: vi.fn(() => ({ mode: 0o40700 })),
-  readdirSync: vi.fn(() => []),
-  readFileSync: vi.fn(() => '# claude-profile hook loaded'),
-}));
+const originalFs = { existsSync: fs.existsSync, statSync: fs.statSync, readdirSync: fs.readdirSync, readFileSync: fs.readFileSync };
+const originalHomedir = os.homedir;
+beforeEach(() => {
+Object.assign(fs, {
+  existsSync: mocks.fn((p: unknown) => typeof p === 'string' && p.includes('claude-profile')),
+  statSync: mocks.fn(() => ({ mode: 0o40700 })),
+  readdirSync: mocks.fn(() => []),
+  readFileSync: mocks.fn(() => '# claude-profile hook loaded'),
+});
 
-vi.mock('os', () => ({
+Object.assign(os, {
   homedir: () => '/tmp',
-}));
+});
 
 // Stub the .git check to look at our process.cwd
 const realCwd = process.cwd();
 const realGitPath = `${realCwd}/.git`;
 
-vi.mock('path', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('path')>();
-  return {
-    ...mod,
-    join: (...parts: string[]) => parts.join('/'),
-  };
+// Native path functions are retained; fixtures use platform-correct paths.
+syncBuiltinESMExports();
 });
+afterEach(() => {
+  Object.assign(fs, originalFs);
+  os.homedir = originalHomedir;
+  syncBuiltinESMExports();
+});
+
 
 function buildMockService(profiles: Profile[], current: string | null): ProfileService {
   return {
@@ -56,7 +65,7 @@ function buildCtx(service: ProfileService): CommandContext {
 
 describe('doctorCommand', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    mocks.clearAllMocks();
   });
 
   it('reports ok when everything is healthy', async () => {
@@ -68,7 +77,6 @@ describe('doctorCommand', () => {
     const service = buildMockService([profile], 'test');
     const ctx = buildCtx(service);
 
-    const { doctorCommand } = await import('../src/commands/doctor.js');
     const result = await doctorCommand(ctx);
     expect(result.success).toBe(true);
     if (result.success) {
@@ -80,7 +88,6 @@ describe('doctorCommand', () => {
     const service = buildMockService([], null);
     const ctx = buildCtx(service);
 
-    const { doctorCommand } = await import('../src/commands/doctor.js');
     const result = await doctorCommand(ctx);
     // Empty profiles is a warning, not an error
     expect(result.success).toBe(true);

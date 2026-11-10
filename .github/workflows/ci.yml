@@ -34,8 +34,11 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Test runner contracts
+        run: npm run test:runner
+
       - name: Coverage
-        run: npx vitest run --coverage
+        run: npm run test:coverage
 
       - name: Verify CLI binary
         shell: bash

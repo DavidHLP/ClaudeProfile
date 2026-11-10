@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { strictEqual } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, it, mocks } from './support/test.js';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -45,12 +46,12 @@ describe('FileSystemBackupStore (real archives)', () => {
     root = mkdtempSync(join(tmpdir(), 'claude-profile-backup-test-'));
     target = join(root, 'target');
     mkdirSync(target);
-    vi.stubEnv('HOME', root);
+    mocks.stubEnv('HOME', root);
     store = new FileSystemBackupStore();
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    mocks.unstubAllEnvs();
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -95,6 +96,6 @@ describe('FileSystemBackupStore (real archives)', () => {
 
     expect(child.error).toBeUndefined();
     expect(child.signal).toBeNull();
-    expect(child.status, child.stderr).toBe(0);
+    strictEqual(child.status, 0, child.stderr);
   }, 15_000);
 });

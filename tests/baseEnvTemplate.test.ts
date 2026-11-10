@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from './support/test.js';
 import { providerTemplates } from '../src/templates/providers.js';
 import { baseEnvTemplate } from '../src/templates/baseEnvTemplate.js';
 
