@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from './support/test.js';
 import { completionCommand } from '../src/commands/completion.js';
 
 describe('completion command', () => {

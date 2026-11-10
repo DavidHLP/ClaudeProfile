@@ -5,7 +5,7 @@
  * a fresh in-memory service + fake prompts without touching the host
  * filesystem or any module-level singletons.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from './support/test.js';
 import type { Profile, ProviderTemplate } from '../src/types/index.js';
 import { InMemoryConfigStore } from '../src/config/inMemoryConfigStore.js';
 import { ProfileServiceImpl } from '../src/services/profileService.js';

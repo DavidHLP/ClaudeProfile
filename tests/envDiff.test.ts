@@ -7,7 +7,7 @@
  * `formatExportShell`, `formatSwitchShell`) are tested through the
  * same expected outputs.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from './support/test.js';
 import {
   diffEnvs,
   buildExportJson,

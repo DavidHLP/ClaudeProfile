@@ -35,10 +35,10 @@ Single-context layout: one `CONTEXT.md` + `docs/adr/` at repo root. See `docs/ag
 ## Build & Test
 
 - Build: `npm run build` (tsc)
-- Test: `npm run test` (vitest run)
+- Test: `npm run test` (Node.js test runner)
 - Test watch: `npm run test:watch`
 - Type check: `npx tsc --noEmit`
-- **Test files location**: All tests go in `tests/` directory (vitest config: `include: ['tests/**/*.test.ts']`)
+- **Test files location**: All tests go in `tests/` directory (runner discovers `tests/**/*.test.ts`; helpers live in `tests/support/`)
 - **Import syntax**: Use `.js` suffix in test imports even for TypeScript sources (e.g., `from '../src/templates/providerRegistry.js'`)
 - **Test singletons**: When testing singleton instances (e.g., `providerRegistry`), create fresh instances in `beforeEach` to avoid test pollution
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from './support/test.js';
 import { AppError } from '../src/errors.js';
 import { isValidEnvKey, shellQuote, validateEnvKeyOrThrow } from '../src/utils/shellSafety.js';
 

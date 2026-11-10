@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, mocks } from './support/test.js';
 import { ProfileServiceImpl } from '../src/services/profileService.js';
 import { InMemoryConfigStore } from '../src/config/inMemoryConfigStore.js';
 import { envPresenter } from '../src/presenters/envRenderer.js';
@@ -15,7 +15,7 @@ function buildCtx(): { ctx: CommandContext; store: InMemoryConfigStore } {
 
 describe('runProfileCommand', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mocks.clearAllMocks();
   });
 
   it('should return error for non-existent profile', async () => {

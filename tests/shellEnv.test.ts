@@ -8,7 +8,7 @@
  * values, invalid keys, custom prefix set, and insertion-order
  * preservation.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from './support/test.js';
 import { CLAUDE_ENV_KEY_PREFIXES, extractClaudeShellEnv } from '../src/domain/shellEnv.js';
 
 describe('ShellEnv', () => {

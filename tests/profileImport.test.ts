@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { fail } from 'node:assert/strict';
+import { describe, it, expect } from './support/test.js';
 import {
   detectImportFormat,
   parseImportedProfile,
@@ -116,7 +117,7 @@ describe('parseImportedProfile — format errors', () => {
   it('throws ProfileImportError(INVALID_FORMAT) on malformed JSON', () => {
     try {
       parseImportedProfile('{ "name": "work", ', 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect(err).toBeInstanceOf(ProfileImportError);
       expect((err as ProfileImportError).code).toBe('INVALID_FORMAT');
@@ -127,7 +128,7 @@ describe('parseImportedProfile — format errors', () => {
   it('throws ProfileImportError(INVALID_FORMAT) on malformed YAML', () => {
     try {
       parseImportedProfile('name: work\nenv:\n  - : : :\n  bad', 'yaml');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect(err).toBeInstanceOf(ProfileImportError);
       expect((err as ProfileImportError).code).toBe('INVALID_FORMAT');
@@ -152,7 +153,7 @@ describe('parseImportedProfile — schema errors', () => {
     const json = JSON.stringify({ env: { ANTHROPIC_AUTH_TOKEN: 'sk' } });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('INVALID_PROFILE_SCHEMA');
     }
@@ -162,7 +163,7 @@ describe('parseImportedProfile — schema errors', () => {
     const json = JSON.stringify({ name: '', env: { ANTHROPIC_AUTH_TOKEN: 'sk' } });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('INVALID_PROFILE_SCHEMA');
     }
@@ -172,7 +173,7 @@ describe('parseImportedProfile — schema errors', () => {
     const json = JSON.stringify({ name: 'work' });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('INVALID_PROFILE_SCHEMA');
     }
@@ -182,7 +183,7 @@ describe('parseImportedProfile — schema errors', () => {
     const json = JSON.stringify({ name: 'work', env: 'not-an-object' });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('INVALID_PROFILE_SCHEMA');
     }
@@ -191,7 +192,7 @@ describe('parseImportedProfile — schema errors', () => {
   it('throws when the parsed value is null', () => {
     try {
       parseImportedProfile('null', 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('INVALID_PROFILE_SCHEMA');
     }
@@ -200,7 +201,7 @@ describe('parseImportedProfile — schema errors', () => {
   it('throws when the parsed value is an array', () => {
     try {
       parseImportedProfile('[]', 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('INVALID_PROFILE_SCHEMA');
     }
@@ -214,7 +215,7 @@ describe('parseImportedProfile — name validation', () => {
     const json = JSON.stringify({ name: 'has space', env: { ANTHROPIC_AUTH_TOKEN: 'sk' } });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('NAME_INVALID');
     }
@@ -225,7 +226,7 @@ describe('parseImportedProfile — name validation', () => {
       const json = JSON.stringify({ name, env: { ANTHROPIC_AUTH_TOKEN: 'sk' } });
       try {
         parseImportedProfile(json, 'json');
-        expect.fail(`expected throw for ${name}`);
+        fail(`expected throw for ${name}`);
       } catch (err) {
         expect((err as ProfileImportError).code).toBe('NAME_INVALID');
       }
@@ -243,7 +244,7 @@ describe('parseImportedProfile — env key validation', () => {
     });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('ENV_KEY_INVALID');
       expect((err as ProfileImportError).message).toContain('1INVALID');
@@ -257,7 +258,7 @@ describe('parseImportedProfile — env key validation', () => {
     });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('ENV_KEY_INVALID');
     }
@@ -278,7 +279,7 @@ describe('parseImportedProfile — env key validation', () => {
     });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       // GOOD_KEY would have passed; the failure is on BAD-KEY.
       expect((err as ProfileImportError).code).toBe('ENV_KEY_INVALID');
@@ -294,7 +295,7 @@ describe('parseImportedProfile — env value validation', () => {
     const json = JSON.stringify({ name: 'work', env: { KEY: null } });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('ENV_VALUE_NULL');
     }
@@ -305,7 +306,7 @@ describe('parseImportedProfile — env value validation', () => {
       const json = JSON.stringify({ name: 'work', env: { KEY: value } });
       try {
         parseImportedProfile(json, 'json');
-        expect.fail(`expected throw for value ${JSON.stringify(value)}`);
+        fail(`expected throw for value ${JSON.stringify(value)}`);
       } catch (err) {
         expect((err as ProfileImportError).code).toBe('ENV_VALUE_TYPE');
       }
@@ -316,7 +317,7 @@ describe('parseImportedProfile — env value validation', () => {
     const json = JSON.stringify({ name: 'work', env: { KEY: 'has\0null' } });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('ENV_VALUE_NULL');
     }
@@ -326,7 +327,7 @@ describe('parseImportedProfile — env value validation', () => {
     const json = JSON.stringify({ name: 'work', env: { KEY: 'has\nnewline' } });
     try {
       parseImportedProfile(json, 'json');
-      expect.fail('expected throw');
+      fail('expected throw');
     } catch (err) {
       expect((err as ProfileImportError).code).toBe('ENV_VALUE_NEWLINE');
     }

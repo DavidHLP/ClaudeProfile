@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from './support/test.js';
 import { execSync } from 'child_process';
 import { writeFileSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -23,7 +23,7 @@ import {
  *      the rendered output to catch a quoting error before users do)
  *
  * If a future change intentionally modifies the bash, regenerate the
- * hashes by running `vitest -u` and inspect the diff in the same commit.
+ * hashes by running the explicit assertion literal and inspect the diff in the same commit.
  */
 
 function hash(s: string): string {
@@ -124,8 +124,6 @@ describe('shellHook renderers', () => {
     // full diff in the same commit. The hash is a sha256 prefix, not a
     // 1:1 string match, so reviewers must read the diff manually.
     const out = renderShellHook();
-    expect(hash(out)).toMatchInlineSnapshot(
-      '"02a2b130e551230c"'
-    );
+    expect(hash(out)).toBe('02a2b130e551230c');
   });
 });
