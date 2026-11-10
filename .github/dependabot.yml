@@ -14,3 +14,18 @@ updates:
       prefix: chore
       prefix-development: chore(dev)
       include: scope
+    # Preserve the Node 18/20/22 support matrix. Revisit these major lines only
+    # in an explicit runtime-support migration; security alerts remain tracked.
+    ignore:
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: [version-update:semver-major]
+      - dependency-name: vite
+        update-types: [version-update:semver-major]
+      - dependency-name: inquirer
+        update-types: [version-update:semver-major]
+    groups:
+      vitest-toolchain:
+        patterns: [vitest, "@vitest/*"]
+        update-types: [minor, patch]
