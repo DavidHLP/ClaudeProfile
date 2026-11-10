@@ -42,7 +42,7 @@
     "@types/inquirer": "^9.0.0",
     "@types/node": "^26.6.6",
     "@types/tar-fs": "^2.0.4",
-    "expect": "29.7.0",
+    "expect": "30.5.2",
     "istanbul-lib-coverage": "^3.2.2",
     "istanbul-lib-report": "^3.0.1",
     "istanbul-reports": "^3.2.0",
